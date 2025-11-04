@@ -1,16 +1,20 @@
 # Quick Start Guide - EWS MCP Server
 
-Get started with EWS MCP Server in under 2 minutes!
+Get started with EWS MCP Server in under 5 minutes!
+
+**⚠️ Note**: Pre-built images from GHCR will be available once merged to main. For now, build locally (adds 2-3 minutes).
 
 ## Choose Your Setup Method
 
-### 🚀 Super Quick (30 seconds) - Basic Auth
+### 🚀 Super Quick (3-4 minutes) - Basic Auth
 
 **Best for**: Testing, on-premises Exchange, demos
 
 ```bash
-# 1. Pull image
-docker pull ghcr.io/azizmazrou/ews-mcp:latest
+# 1. Clone and build
+git clone https://github.com/azizmazrou/ews-mcp.git
+cd ews-mcp
+docker build -t ews-mcp-server:latest .
 
 # 2. Create config
 cat > .env <<EOF
@@ -24,7 +28,7 @@ LOG_LEVEL=INFO
 EOF
 
 # 3. Run
-docker run -d --name ews-mcp --env-file .env ghcr.io/azizmazrou/ews-mcp:latest
+docker run -d --name ews-mcp --env-file .env ews-mcp-server:latest
 
 # 4. Check
 docker logs ews-mcp
@@ -32,9 +36,16 @@ docker logs ews-mcp
 
 ✅ **Done!** Look for "✓ Successfully connected to Exchange"
 
-### 🎯 Interactive Setup (1 minute) - Guided
+### 🎯 Interactive Setup (3-4 minutes) - Guided
 
 ```bash
+# Clone if not done
+git clone https://github.com/azizmazrou/ews-mcp.git
+cd ews-mcp
+
+# Build once
+docker build -t ews-mcp-server:latest .
+
 # Run interactive setup
 ./scripts/setup-basic-auth.sh
 ```

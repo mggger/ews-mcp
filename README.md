@@ -2,6 +2,8 @@
 
 A complete Model Context Protocol (MCP) server that interfaces with Microsoft Exchange Web Services (EWS), enabling AI assistants to interact with Exchange for email, calendar, contacts, and task operations.
 
+> **📦 Docker Images**: Pre-built images will be available at `ghcr.io/azizmazrou/ews-mcp:latest` once merged to main branch. For now, build locally with `docker build -t ews-mcp-server .` - See [GHCR_STATUS.md](GHCR_STATUS.md) for details.
+
 ## Features
 
 - ✅ **Email Operations**: Send, read, search, delete, move emails with attachment support
@@ -28,7 +30,7 @@ Choose your authentication method:
 # Pull the latest image
 docker pull ghcr.io/azizmazrou/ews-mcp:latest
 
-# Create .env file with Basic Auth
+# 3. Create .env file with Basic Auth
 cat > .env <<EOF
 EWS_SERVER_URL=https://mail.company.com/EWS/Exchange.asmx
 EWS_EMAIL=user@company.com
@@ -39,7 +41,7 @@ EWS_PASSWORD=your-password
 LOG_LEVEL=INFO
 EOF
 
-# Run the container
+# 4. Run the container
 docker run -d \
   --name ews-mcp-server \
   --env-file .env \
