@@ -1,0 +1,242 @@
+"""Main MCP Server implementation for Exchange Web Services."""
+
+import asyncio
+import logging
+import sys
+from typing import Any
+
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import Tool, TextContent
+
+from .config import settings
+from .auth import AuthHandler
+from .ews_client import EWSClient
+from .middleware.logging import setup_logging, AuditLogger
+from .middleware.error_handler import ErrorHandler
+from .middleware.rate_limiter import RateLimiter
+from .exceptions import EWSMCPException
+
+# Import all tool classes
+from .tools import (
+    SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEmailDetailsTool,
+    DeleteEmailTool, MoveEmailTool,
+    CreateAppointmentTool, GetCalendarTool, UpdateAppointmentTool,
+    DeleteAppointmentTool, RespondToMeetingTool,
+    CreateContactTool, SearchContactsTool, GetContactsTool,
+    UpdateContactTool, DeleteContactTool,
+    CreateTaskTool, GetTasksTool, UpdateTaskTool,
+    CompleteTaskTool, DeleteTaskTool
+)
+
+
+class EWSMCPServer:
+    """MCP Server for Exchange Web Services."""
+
+    def __init__(self):
+        # Set up logging
+        setup_logging(settings.log_level)
+        self.logger = logging.getLogger(__name__)
+
+        # Initialize server
+        self.server = Server(settings.mcp_server_name)
+
+        # Initialize components
+        self.auth_handler = AuthHandler(settings)
+        self.ews_client = EWSClient(settings, self.auth_handler)
+        self.error_handler = ErrorHandler()
+        self.audit_logger = AuditLogger()
+
+        # Rate limiter (if enabled)
+        self.rate_limiter = None
+        if settings.rate_limit_enabled:
+            self.rate_limiter = RateLimiter(settings.rate_limit_requests_per_minute)
+
+        # Tool registry
+        self.tools = {}
+
+        # Register handlers
+        self._register_handlers()
+
+    def _register_handlers(self):
+        """Register MCP protocol handlers."""
+
+        @self.server.list_tools()
+        async def list_tools() -> list[Tool]:
+            """List all available tools."""
+            return [
+                Tool(
+                    name=tool.get_schema()["name"],
+                    description=tool.get_schema()["description"],
+                    inputSchema=tool.get_schema()["inputSchema"]
+                )
+                for tool in self.tools.values()
+            ]
+
+        @self.server.call_tool()
+        async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+            """Execute a tool."""
+            # Check rate limit
+            if self.rate_limiter:
+                try:
+                    self.rate_limiter.check_and_raise()
+                except Exception as e:
+                    return [TextContent(
+                        type="text",
+                        text=str(self.error_handler.handle_exception(e, f"Rate limit"))
+                    )]
+
+            # Check if tool exists
+            if name not in self.tools:
+                error_response = {
+                    "success": False,
+                    "error": f"Unknown tool: {name}",
+                    "available_tools": list(self.tools.keys())
+                }
+                return [TextContent(
+                    type="text",
+                    text=str(error_response)
+                )]
+
+            # Execute tool
+            tool = self.tools[name]
+            self.logger.info(f"Executing tool: {name}")
+
+            try:
+                result = await tool.safe_execute(**arguments)
+
+                # Audit log
+                if settings.enable_audit_log:
+                    self.audit_logger.log_operation(
+                        operation=name,
+                        user=settings.ews_email,
+                        success=result.get("success", False),
+                        details={"arguments": arguments}
+                    )
+
+                return [TextContent(
+                    type="text",
+                    text=str(result)
+                )]
+
+            except Exception as e:
+                self.logger.exception(f"Tool execution failed: {name}")
+                error_response = self.error_handler.handle_exception(e, f"Tool: {name}")
+                return [TextContent(
+                    type="text",
+                    text=str(error_response)
+                )]
+
+    def register_tools(self):
+        """Register all enabled tools."""
+        tool_classes = []
+
+        # Email tools
+        if settings.enable_email:
+            tool_classes.extend([
+                SendEmailTool,
+                ReadEmailsTool,
+                SearchEmailsTool,
+                GetEmailDetailsTool,
+                DeleteEmailTool,
+                MoveEmailTool
+            ])
+            self.logger.info("Email tools enabled")
+
+        # Calendar tools
+        if settings.enable_calendar:
+            tool_classes.extend([
+                CreateAppointmentTool,
+                GetCalendarTool,
+                UpdateAppointmentTool,
+                DeleteAppointmentTool,
+                RespondToMeetingTool
+            ])
+            self.logger.info("Calendar tools enabled")
+
+        # Contact tools
+        if settings.enable_contacts:
+            tool_classes.extend([
+                CreateContactTool,
+                SearchContactsTool,
+                GetContactsTool,
+                UpdateContactTool,
+                DeleteContactTool
+            ])
+            self.logger.info("Contact tools enabled")
+
+        # Task tools
+        if settings.enable_tasks:
+            tool_classes.extend([
+                CreateTaskTool,
+                GetTasksTool,
+                UpdateTaskTool,
+                CompleteTaskTool,
+                DeleteTaskTool
+            ])
+            self.logger.info("Task tools enabled")
+
+        # Instantiate and register tools
+        for tool_class in tool_classes:
+            tool = tool_class(self.ews_client)
+            schema = tool.get_schema()
+            self.tools[schema["name"]] = tool
+
+        self.logger.info(f"Registered {len(self.tools)} tools: {', '.join(self.tools.keys())}")
+
+    async def run(self):
+        """Run the MCP server."""
+        try:
+            self.logger.info(f"Starting {settings.mcp_server_name}")
+            self.logger.info(f"Server: {settings.ews_server_url or 'autodiscover'}")
+            self.logger.info(f"User: {settings.ews_email}")
+            self.logger.info(f"Auth: {settings.ews_auth_type}")
+
+            # Test connection
+            self.logger.info("Testing Exchange connection...")
+            if not self.ews_client.test_connection():
+                self.logger.error("Failed to connect to Exchange server")
+                self.logger.error("Please check your configuration and credentials")
+                return
+
+            self.logger.info("✓ Successfully connected to Exchange")
+
+            # Register tools
+            self.register_tools()
+
+            # Start server
+            self.logger.info(f"Server ready - listening on stdio")
+
+            async with stdio_server() as (read_stream, write_stream):
+                await self.server.run(
+                    read_stream,
+                    write_stream,
+                    self.server.create_initialization_options()
+                )
+
+        except KeyboardInterrupt:
+            self.logger.info("Shutting down...")
+        except Exception as e:
+            self.logger.exception(f"Server error: {e}")
+            raise
+        finally:
+            # Cleanup
+            self.ews_client.close()
+            self.logger.info("Server stopped")
+
+
+def main():
+    """Entry point."""
+    try:
+        server = EWSMCPServer()
+        asyncio.run(server.run())
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Fatal error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
