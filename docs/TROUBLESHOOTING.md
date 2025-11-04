@@ -293,6 +293,81 @@ pip install -r requirements.txt
 - deleted
 - junk
 
+## Docker Build Issues
+
+### Problem: "pip install failed with exit code 1"
+
+**Symptoms:**
+```
+ERROR: Cannot install pydantic-settings==2.1.0 and pydantic==2.5.3
+because these package versions have conflicting dependencies.
+```
+
+**Solution:**
+This error occurs with older versions of requirements.txt. Ensure you have the latest version:
+
+```bash
+# Pull latest changes
+git pull origin main
+
+# Verify requirements.txt has correct versions
+grep "pydantic" requirements.txt
+# Should show:
+# pydantic>=2.8.0
+# pydantic-settings>=2.5.2
+```
+
+**Root Cause:**
+- `mcp>=1.0.0` requires `pydantic>=2.8.0` and `pydantic-settings>=2.5.2`
+- Older requirements.txt had `pydantic==2.5.3` and `pydantic-settings==2.1.0`
+- Fixed in commit `b286d92` and later
+
+### Problem: "Docker build fails on Alpine Linux"
+
+**Symptoms:**
+```
+ERROR: failed to build: exchangelib dependencies cannot be installed
+```
+
+**Solution:**
+The Dockerfile has been updated to use Debian slim instead of Alpine:
+
+```dockerfile
+# Correct (current version)
+FROM python:3.11-slim
+
+# Incorrect (old version)
+FROM python:3.11-alpine
+```
+
+**If you see this error:**
+1. Pull latest code: `git pull origin main`
+2. Rebuild without cache: `docker build --no-cache -t ews-mcp-server .`
+
+### Problem: GitHub Actions workflows failing
+
+**Symptoms:**
+- "buildx failed with: ERROR: failed to build"
+- "Process completed with exit code 1"
+- Python tests being canceled
+
+**Solutions:**
+
+1. **For dependency conflicts:**
+   - Ensure branch has latest commit with fixed requirements.txt
+   - Check commit hash in workflow logs matches latest
+   - Old commit: `f68e530` (broken)
+   - Fixed commit: `b286d92` or later
+
+2. **For attestation errors:**
+   - Workflows have been updated to remove problematic attestation
+   - Pull latest `.github/workflows/docker-publish.yml`
+
+3. **For matrix cancellation:**
+   - Workflows now have `fail-fast: false`
+   - Tests run in non-blocking mode
+   - Pull latest `.github/workflows/python-tests.yml`
+
 ## Getting Help
 
 1. **Check Logs:** Always check logs first
@@ -300,11 +375,14 @@ pip install -r requirements.txt
 3. **Test Connection:** Use test_connection() method
 4. **Isolate Issue:** Test with minimal configuration
 5. **Check Documentation:** Review relevant docs sections
-6. **Create Issue:** If all else fails, create GitHub issue with:
+6. **Verify Dependencies:** Check you have latest requirements.txt
+7. **Check Commit:** Ensure using latest commit (not old PR branch)
+8. **Create Issue:** If all else fails, create GitHub issue with:
    - Error message (redact credentials)
    - Configuration (redact secrets)
    - Steps to reproduce
    - Environment details (OS, Python version, Docker version)
+   - Git commit hash
 
 ## Useful Commands
 
