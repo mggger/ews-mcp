@@ -62,12 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated CI/CD pipeline with GitHub Actions
 - Python test workflow with multiple Python versions
 - Docker build test workflow for PRs
+- Pre-configured `.env.basic.example` template for Basic Authentication
+- Pre-configured `.env.oauth2.example` template for OAuth2
+- Interactive setup script `scripts/setup-basic-auth.sh`
+- QUICK_START.md standalone guide
+- Authentication comparison table in README
+- 30-second Basic Auth quick start guide
+- Inline troubleshooting for Basic Auth
 
 ### Changed
 - Updated README with GHCR pull instructions
 - Updated deployment documentation with GHCR as recommended method
 - Updated Claude Desktop examples to use GHCR images
 - Improved Quick Start with pre-built image option
+- Restructured Configuration section with Basic Auth as primary option
+- Enhanced documentation with three setup methods (copy-paste, template, interactive)
+- Setup time reduced from 15 minutes to 30 seconds for Basic Auth
 
 ### Planned Features
 - Folder management tools
