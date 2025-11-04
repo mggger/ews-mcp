@@ -73,5 +73,21 @@ class Settings(BaseSettings):
         return v
 
 
-# Singleton instance
-settings = Settings()
+# Singleton instance - lazy loading
+_settings: Optional[Settings] = None
+
+
+def get_settings() -> Settings:
+    """Get or create settings instance (lazy loading)."""
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
+
+
+# Backward compatibility - will only be evaluated when accessed
+def __getattr__(name):
+    """Lazy attribute access for backward compatibility."""
+    if name == "settings":
+        return get_settings()
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
