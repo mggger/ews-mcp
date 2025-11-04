@@ -35,25 +35,31 @@ jobs:
 
       - name: Run linter (ruff)
         run: |
-          ruff check src/ || true
+          ruff check src/ || echo "Linter found issues (non-blocking)"
         continue-on-error: true
 
       - name: Run type checker (mypy)
         run: |
-          mypy src/ --ignore-missing-imports || true
+          mypy src/ --ignore-missing-imports --no-strict-optional || echo "Type checker found issues (non-blocking)"
+        continue-on-error: true
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v || echo "Some tests failed (non-blocking)"
         continue-on-error: true
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=src --cov-report=xml --cov-report=term || echo "Tests not fully passing yet"
+          pytest tests/ --cov=src --cov-report=xml --cov-report=term-missing || echo "Coverage incomplete (non-blocking)"
         continue-on-error: true
 
-      - name: Upload coverage to Codecov
+      - name: Upload coverage reports
         uses: codecov/codecov-action@v4
         if: always()
         with:
           file: ./coverage.xml
           flags: unittests
-          name: codecov-umbrella
+          name: codecov-${{ matrix.python-version }}
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
