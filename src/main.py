@@ -9,7 +9,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
-from .config import settings
+from .config import get_settings
 from .auth import AuthHandler
 from .ews_client import EWSClient
 from .middleware.logging import setup_logging, AuditLogger
@@ -34,23 +34,26 @@ class EWSMCPServer:
     """MCP Server for Exchange Web Services."""
 
     def __init__(self):
+        # Get settings (lazy loading)
+        self.settings = get_settings()
+
         # Set up logging
-        setup_logging(settings.log_level)
+        setup_logging(self.settings.log_level)
         self.logger = logging.getLogger(__name__)
 
         # Initialize server
-        self.server = Server(settings.mcp_server_name)
+        self.server = Server(self.settings.mcp_server_name)
 
         # Initialize components
-        self.auth_handler = AuthHandler(settings)
-        self.ews_client = EWSClient(settings, self.auth_handler)
+        self.auth_handler = AuthHandler(self.settings)
+        self.ews_client = EWSClient(self.settings, self.auth_handler)
         self.error_handler = ErrorHandler()
         self.audit_logger = AuditLogger()
 
         # Rate limiter (if enabled)
         self.rate_limiter = None
-        if settings.rate_limit_enabled:
-            self.rate_limiter = RateLimiter(settings.rate_limit_requests_per_minute)
+        if self.settings.rate_limit_enabled:
+            self.rate_limiter = RateLimiter(self.settings.rate_limit_requests_per_minute)
 
         # Tool registry
         self.tools = {}
@@ -106,10 +109,10 @@ class EWSMCPServer:
                 result = await tool.safe_execute(**arguments)
 
                 # Audit log
-                if settings.enable_audit_log:
+                if self.settings.enable_audit_log:
                     self.audit_logger.log_operation(
                         operation=name,
-                        user=settings.ews_email,
+                        user=self.settings.ews_email,
                         success=result.get("success", False),
                         details={"arguments": arguments}
                     )
@@ -132,7 +135,7 @@ class EWSMCPServer:
         tool_classes = []
 
         # Email tools
-        if settings.enable_email:
+        if self.settings.enable_email:
             tool_classes.extend([
                 SendEmailTool,
                 ReadEmailsTool,
@@ -144,7 +147,7 @@ class EWSMCPServer:
             self.logger.info("Email tools enabled")
 
         # Calendar tools
-        if settings.enable_calendar:
+        if self.settings.enable_calendar:
             tool_classes.extend([
                 CreateAppointmentTool,
                 GetCalendarTool,
@@ -155,7 +158,7 @@ class EWSMCPServer:
             self.logger.info("Calendar tools enabled")
 
         # Contact tools
-        if settings.enable_contacts:
+        if self.settings.enable_contacts:
             tool_classes.extend([
                 CreateContactTool,
                 SearchContactsTool,
@@ -166,7 +169,7 @@ class EWSMCPServer:
             self.logger.info("Contact tools enabled")
 
         # Task tools
-        if settings.enable_tasks:
+        if self.settings.enable_tasks:
             tool_classes.extend([
                 CreateTaskTool,
                 GetTasksTool,
@@ -187,10 +190,10 @@ class EWSMCPServer:
     async def run(self):
         """Run the MCP server."""
         try:
-            self.logger.info(f"Starting {settings.mcp_server_name}")
-            self.logger.info(f"Server: {settings.ews_server_url or 'autodiscover'}")
-            self.logger.info(f"User: {settings.ews_email}")
-            self.logger.info(f"Auth: {settings.ews_auth_type}")
+            self.logger.info(f"Starting {self.settings.mcp_server_name}")
+            self.logger.info(f"Server: {self.settings.ews_server_url or 'autodiscover'}")
+            self.logger.info(f"User: {self.settings.ews_email}")
+            self.logger.info(f"Auth: {self.settings.ews_auth_type}")
 
             # Test connection
             self.logger.info("Testing Exchange connection...")
