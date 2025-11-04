@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "ews": {
+      "comment": "EWS MCP Server - Docker deployment",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--env-file",
+        "/absolute/path/to/ews-mcp/.env",
+        "ews-mcp-server"
+      ]
+    },
+    "ews-local": {
+      "comment": "EWS MCP Server - Local Python (development)",
+      "command": "python",
+      "args": ["-m", "src.main"],
+      "cwd": "/absolute/path/to/ews-mcp",
+      "env": {
+        "EWS_SERVER_URL": "https://outlook.office365.com/EWS/Exchange.asmx",
+        "EWS_EMAIL": "your.email@company.com",
+        "EWS_AUTH_TYPE": "oauth2",
+        "EWS_CLIENT_ID": "your-azure-app-client-id",
+        "EWS_CLIENT_SECRET": "your-azure-app-secret",
+        "EWS_TENANT_ID": "your-azure-tenant-id",
+        "LOG_LEVEL": "INFO"
+      }
+    },
+    "ews-basic-auth": {
+      "comment": "EWS MCP Server - Basic Authentication (on-premises)",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "EWS_SERVER_URL=https://mail.company.com/EWS/Exchange.asmx",
+        "-e", "EWS_EMAIL=user@company.com",
+        "-e", "EWS_AUTH_TYPE=basic",
+        "-e", "EWS_USERNAME=user@company.com",
+        "-e", "EWS_PASSWORD=your-password",
+        "ews-mcp-server"
+      ]
+    }
+  }
+}
