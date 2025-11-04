@@ -16,18 +16,44 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 
 ## Quick Start
 
-### Using Docker (Recommended)
+### Using Pre-built Docker Image (Easiest)
+
+```bash
+# Pull the latest image from GitHub Container Registry
+docker pull ghcr.io/azizmazrou/ews-mcp:latest
+
+# Create .env file with your credentials
+cat > .env <<EOF
+EWS_EMAIL=user@company.com
+EWS_AUTH_TYPE=oauth2
+EWS_CLIENT_ID=your-client-id
+EWS_CLIENT_SECRET=your-client-secret
+EWS_TENANT_ID=your-tenant-id
+EOF
+
+# Run the container
+docker run -d \
+  --name ews-mcp-server \
+  --env-file .env \
+  -v $(pwd)/logs:/app/logs \
+  ghcr.io/azizmazrou/ews-mcp:latest
+
+# View logs
+docker logs -f ews-mcp-server
+```
+
+### Building from Source
 
 ```bash
 # Clone repository
-git clone <repo-url>
-cd ews-mcp-server
+git clone https://github.com/azizmazrou/ews-mcp.git
+cd ews-mcp
 
 # Copy and configure environment
 cp .env.example .env
 # Edit .env with your Exchange credentials
 
-# Build and run
+# Build and run with Docker Compose
 docker-compose up -d
 
 # View logs
@@ -124,6 +150,28 @@ Add to your Claude Desktop configuration file:
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
+### Using Pre-built Image from GHCR (Recommended)
+
+```json
+{
+  "mcpServers": {
+    "ews": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--env-file",
+        "/absolute/path/to/.env",
+        "ghcr.io/azizmazrou/ews-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+### Using Locally Built Image
+
 ```json
 {
   "mcpServers": {
@@ -142,7 +190,7 @@ Add to your Claude Desktop configuration file:
 }
 ```
 
-Or for local development:
+### Using Local Python (Development)
 
 ```json
 {
@@ -162,6 +210,31 @@ Or for local development:
   }
 }
 ```
+
+## Docker Images
+
+Pre-built Docker images are automatically published to GitHub Container Registry:
+
+```bash
+# Pull latest version
+docker pull ghcr.io/azizmazrou/ews-mcp:latest
+
+# Pull specific version
+docker pull ghcr.io/azizmazrou/ews-mcp:1.0.0
+
+# Pull development version
+docker pull ghcr.io/azizmazrou/ews-mcp:main
+```
+
+**Available Tags:**
+- `latest` - Latest stable release
+- `v*.*.*` - Specific version (e.g., `v1.0.0`)
+- `main` - Latest commit on main branch
+- `sha-<commit>` - Specific commit
+
+**Multi-platform Support:**
+- `linux/amd64` - x86_64 systems
+- `linux/arm64` - ARM64 systems (Apple Silicon, ARM servers)
 
 ## Available Tools
 
@@ -251,11 +324,12 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and sol
 
 ## Documentation
 
-- [Setup Guide](docs/SETUP.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
-- [API Documentation](docs/API.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Setup Guide](docs/SETUP.md) - Step-by-step setup instructions
+- [Deployment Guide](docs/DEPLOYMENT.md) - Deploy to various platforms
+- [GHCR Guide](docs/GHCR.md) - Using pre-built Docker images
+- [API Documentation](docs/API.md) - Complete tool reference
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Architecture Overview](docs/ARCHITECTURE.md) - Technical deep dive
 
 ## License
 

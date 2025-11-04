@@ -2,7 +2,63 @@
 
 Complete guide for deploying EWS MCP Server in various environments.
 
-## Docker Deployment (Recommended)
+## Pre-built Docker Image (Easiest)
+
+The fastest way to deploy is using pre-built images from GitHub Container Registry (GHCR).
+
+### Pull and Run
+
+```bash
+# Pull latest image
+docker pull ghcr.io/azizmazrou/ews-mcp:latest
+
+# Create .env file
+cat > .env <<EOF
+EWS_EMAIL=user@company.com
+EWS_AUTH_TYPE=oauth2
+EWS_CLIENT_ID=your-client-id
+EWS_CLIENT_SECRET=your-client-secret
+EWS_TENANT_ID=your-tenant-id
+EOF
+
+# Run container
+docker run -d \
+  --name ews-mcp-server \
+  --env-file .env \
+  -v $(pwd)/logs:/app/logs \
+  ghcr.io/azizmazrou/ews-mcp:latest
+
+# Check logs
+docker logs -f ews-mcp-server
+```
+
+### Using Docker Compose with GHCR
+
+Create `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  ews-mcp-server:
+    image: ghcr.io/azizmazrou/ews-mcp:latest
+    container_name: ews-mcp-server
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs:rw
+```
+
+Run:
+
+```bash
+docker-compose up -d
+```
+
+**See [GHCR Guide](GHCR.md) for more details on using pre-built images.**
+
+## Docker Deployment from Source
 
 ### Standalone Container
 

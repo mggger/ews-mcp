@@ -52,6 +52,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- GitHub Actions workflow for automated Docker image building
+- GitHub Container Registry (GHCR) publishing
+- Multi-platform Docker images (amd64 + arm64)
+- Pre-built Docker images available at `ghcr.io/azizmazrou/ews-mcp`
+- Comprehensive GHCR usage guide
+- Docker Compose file for GHCR images
+- Automated CI/CD pipeline with GitHub Actions
+- Python test workflow with multiple Python versions
+- Docker build test workflow for PRs
+
+### Changed
+- Updated README with GHCR pull instructions
+- Updated deployment documentation with GHCR as recommended method
+- Updated Claude Desktop examples to use GHCR images
+- Improved Quick Start with pre-built image option
+
 ### Planned Features
 - Folder management tools
 - Advanced attachment handling

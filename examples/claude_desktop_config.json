@@ -1,7 +1,19 @@
 {
   "mcpServers": {
     "ews": {
-      "comment": "EWS MCP Server - Docker deployment",
+      "comment": "EWS MCP Server - Pre-built image from GHCR (Recommended)",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--env-file",
+        "/absolute/path/to/.env",
+        "ghcr.io/azizmazrou/ews-mcp:latest"
+      ]
+    },
+    "ews-local-build": {
+      "comment": "EWS MCP Server - Locally built image",
       "command": "docker",
       "args": [
         "run",
