@@ -1,17 +1,16 @@
 # Multi-stage build for minimal image size
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim AS builder
 
 # Install build dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    musl-dev \
+    g++ \
     libffi-dev \
-    openssl-dev \
-    python3-dev \
-    cargo \
-    rust \
+    libssl-dev \
     libxml2-dev \
-    libxslt-dev
+    libxslt1-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -23,19 +22,18 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Runtime stage
-FROM python:3.11-alpine
+FROM python:3.11-slim
 
 # Install runtime dependencies
-RUN apk add --no-cache \
-    libffi \
-    openssl \
-    ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2 \
-    libxslt
+    libxslt1.1 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1000 mcp && \
-    adduser -D -u 1000 -G mcp mcp
+RUN groupadd -g 1000 mcp && \
+    useradd -r -u 1000 -g mcp -m -s /bin/bash mcp
 
 # Set working directory
 WORKDIR /app
