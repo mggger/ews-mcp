@@ -59,5 +59,5 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Switch to non-root user
 USER mcp
 
-# Run server
-ENTRYPOINT ["python", "-m", "src.main"]
+# Run server (use CMD for easy override in tests)
+CMD ["python", "-m", "src.main"]
