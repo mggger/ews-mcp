@@ -7,7 +7,11 @@ RUN apk add --no-cache \
     musl-dev \
     libffi-dev \
     openssl-dev \
-    python3-dev
+    python3-dev \
+    cargo \
+    rust \
+    libxml2-dev \
+    libxslt-dev
 
 # Set working directory
 WORKDIR /app
@@ -25,7 +29,9 @@ FROM python:3.11-alpine
 RUN apk add --no-cache \
     libffi \
     openssl \
-    ca-certificates
+    ca-certificates \
+    libxml2 \
+    libxslt
 
 # Create non-root user
 RUN addgroup -g 1000 mcp && \
