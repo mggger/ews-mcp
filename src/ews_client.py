@@ -1,9 +1,10 @@
 """Exchange Web Services client wrapper."""
 
-from exchangelib import Account, Configuration, DELEGATE, Version
+from exchangelib import Account, Configuration, DELEGATE, Version, EWSTimeZone
 from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import logging
+import pytz
 from typing import Optional
 
 from .config import Settings
@@ -39,9 +40,18 @@ class EWSClient:
         """Create Exchange account with retry logic."""
         try:
             self.logger.info(f"Connecting to Exchange for {self.config.ews_email}")
+            self.logger.info(f"Using timezone: {self.config.timezone}")
 
             # Get credentials
             credentials = self.auth_handler.get_credentials()
+
+            # Get timezone - use EWSTimeZone from exchangelib
+            try:
+                tz = EWSTimeZone.timezone(self.config.timezone)
+                self.logger.info(f"Successfully loaded timezone: {self.config.timezone}")
+            except Exception as e:
+                self.logger.warning(f"Failed to load timezone {self.config.timezone}, falling back to UTC: {e}")
+                tz = EWSTimeZone.timezone('UTC')
 
             # Use autodiscovery or manual configuration
             if self.config.ews_autodiscover:
@@ -50,7 +60,8 @@ class EWSClient:
                     primary_smtp_address=self.config.ews_email,
                     credentials=credentials,
                     autodiscover=True,
-                    access_type=DELEGATE
+                    access_type=DELEGATE,
+                    default_timezone=tz
                 )
             else:
                 if not self.config.ews_server_url:
@@ -65,7 +76,8 @@ class EWSClient:
                     primary_smtp_address=self.config.ews_email,
                     config=config,
                     autodiscover=False,
-                    access_type=DELEGATE
+                    access_type=DELEGATE,
+                    default_timezone=tz
                 )
 
             # Test the connection

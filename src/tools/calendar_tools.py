@@ -7,7 +7,7 @@ from exchangelib import CalendarItem, Mailbox, Attendee
 from .base import BaseTool
 from ..models import CreateAppointmentRequest, MeetingResponse
 from ..exceptions import ToolExecutionError
-from ..utils import format_success_response, safe_get
+from ..utils import format_success_response, safe_get, parse_datetime_tz_aware, make_tz_aware
 
 
 class CreateAppointmentTool(BaseTool):
@@ -62,9 +62,9 @@ class CreateAppointmentTool(BaseTool):
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Create calendar appointment."""
-        # Parse datetime strings
-        kwargs["start_time"] = datetime.fromisoformat(kwargs["start_time"])
-        kwargs["end_time"] = datetime.fromisoformat(kwargs["end_time"])
+        # Parse datetime strings as timezone-aware
+        kwargs["start_time"] = parse_datetime_tz_aware(kwargs["start_time"])
+        kwargs["end_time"] = parse_datetime_tz_aware(kwargs["end_time"])
 
         # Validate input
         request = self.validate_input(CreateAppointmentRequest, **kwargs)
@@ -147,16 +147,16 @@ class GetCalendarTool(BaseTool):
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Get calendar events."""
         try:
-            # Parse dates
+            # Parse dates as timezone-aware
             start_date = kwargs.get("start_date")
             if start_date:
-                start_date = datetime.fromisoformat(start_date)
+                start_date = parse_datetime_tz_aware(start_date)
             else:
-                start_date = datetime.now()
+                start_date = make_tz_aware(datetime.now())
 
             end_date = kwargs.get("end_date")
             if end_date:
-                end_date = datetime.fromisoformat(end_date)
+                end_date = parse_datetime_tz_aware(end_date)
             else:
                 end_date = start_date + timedelta(days=7)
 
@@ -252,10 +252,10 @@ class UpdateAppointmentTool(BaseTool):
                 item.subject = kwargs["subject"]
 
             if "start_time" in kwargs:
-                item.start = datetime.fromisoformat(kwargs["start_time"])
+                item.start = parse_datetime_tz_aware(kwargs["start_time"])
 
             if "end_time" in kwargs:
-                item.end = datetime.fromisoformat(kwargs["end_time"])
+                item.end = parse_datetime_tz_aware(kwargs["end_time"])
 
             if "location" in kwargs:
                 item.location = kwargs["location"]

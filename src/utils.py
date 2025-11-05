@@ -3,6 +3,57 @@
 from datetime import datetime
 from typing import Any, Dict, Optional
 import logging
+import os
+from exchangelib import EWSTimeZone
+import pytz
+
+
+def get_timezone():
+    """Get the configured timezone as EWSTimeZone."""
+    # Get timezone from environment or default to UTC
+    tz_name = os.environ.get('TIMEZONE', os.environ.get('TZ', 'UTC'))
+    try:
+        return EWSTimeZone.timezone(tz_name)
+    except Exception:
+        # Fallback to UTC if timezone not found
+        return EWSTimeZone.timezone('UTC')
+
+
+def get_pytz_timezone():
+    """Get the configured timezone as pytz timezone."""
+    tz_name = os.environ.get('TIMEZONE', os.environ.get('TZ', 'UTC'))
+    try:
+        return pytz.timezone(tz_name)
+    except Exception:
+        return pytz.UTC
+
+
+def make_tz_aware(dt: datetime) -> datetime:
+    """Make a naive datetime timezone-aware using configured timezone."""
+    if dt.tzinfo is not None:
+        # Already timezone-aware
+        return dt
+
+    tz = get_pytz_timezone()
+    return tz.localize(dt)
+
+
+def parse_datetime_tz_aware(dt_str: str) -> datetime:
+    """Parse ISO 8601 datetime string and make it timezone-aware."""
+    if not dt_str:
+        return None
+
+    try:
+        # Parse the datetime
+        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+
+        # Make timezone-aware if naive
+        if dt.tzinfo is None:
+            dt = make_tz_aware(dt)
+
+        return dt
+    except ValueError:
+        return None
 
 
 def format_datetime(dt: Optional[datetime]) -> Optional[str]:
@@ -13,7 +64,7 @@ def format_datetime(dt: Optional[datetime]) -> Optional[str]:
 
 
 def parse_datetime(dt_str: Optional[str]) -> Optional[datetime]:
-    """Parse ISO 8601 datetime string."""
+    """Parse ISO 8601 datetime string (legacy - use parse_datetime_tz_aware instead)."""
     if not dt_str:
         return None
     try:
