@@ -264,14 +264,16 @@ class EWSMCPServer:
                 )
             return Response()
 
-        async def handle_messages(scope, receive, send):
-            """Handle POST messages endpoint - ASGI interface.
+        async def handle_messages(request):
+            """Handle POST messages endpoint.
 
-            Note: This is a raw ASGI endpoint (not a Starlette Request endpoint)
-            because handle_post_message needs direct access to scope/receive/send.
-            It sends its own HTTP response (202 Accepted), so we don't return anything.
+            Note: handle_post_message sends its own HTTP response (202 Accepted)
+            using the ASGI send callable, so we don't return a Response object.
+            Returning None is acceptable in Starlette when the response has already
+            been sent directly via ASGI.
             """
-            await sse.handle_post_message(scope, receive, send)
+            await sse.handle_post_message(request.scope, request.receive, request._send)
+            # Don't return anything - response already sent by handle_post_message
 
         # Create Starlette app
         app = Starlette(
