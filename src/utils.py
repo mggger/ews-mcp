@@ -40,11 +40,23 @@ def make_tz_aware(dt: datetime) -> EWSDateTime:
     tz = get_timezone()
 
     if dt.tzinfo is not None:
-        # Already timezone-aware, convert to EWSDateTime
-        return EWSDateTime.from_datetime(dt).replace(tzinfo=tz)
+        # Already timezone-aware - convert to target timezone first
+        # Get the target timezone as pytz for conversion
+        tz_name = os.environ.get('TIMEZONE', os.environ.get('TZ', 'UTC'))
+        target_tz = pytz.timezone(tz_name)
+
+        # Convert to target timezone
+        dt_converted = dt.astimezone(target_tz)
+
+        # Create EWSDateTime with EWSTimeZone
+        return EWSDateTime(
+            dt_converted.year, dt_converted.month, dt_converted.day,
+            dt_converted.hour, dt_converted.minute, dt_converted.second,
+            dt_converted.microsecond,
+            tzinfo=tz
+        )
 
     # Naive datetime - create EWSDateTime with configured timezone
-    # Create as UTC-aware first, then localize to target timezone
     return EWSDateTime(
         dt.year, dt.month, dt.day,
         dt.hour, dt.minute, dt.second,
