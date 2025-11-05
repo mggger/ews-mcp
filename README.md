@@ -11,6 +11,8 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 - ✅ **Contact Management**: Full CRUD operations for Exchange contacts
 - ✅ **Task Management**: Create and manage Exchange tasks
 - ✅ **Multi-Authentication**: Support for OAuth2, Basic Auth, and NTLM
+- ✅ **Timezone Support**: Proper handling of timezones (tested with Asia/Riyadh, UTC, etc.)
+- ✅ **HTTP/SSE Transport**: Support for both stdio and HTTP/SSE for web clients (n8n compatible)
 - ✅ **Docker Ready**: Production-ready containerization with best practices
 - ✅ **Rate Limiting**: Built-in rate limiting to prevent API abuse
 - ✅ **Error Handling**: Comprehensive error handling and logging
@@ -38,6 +40,7 @@ EWS_AUTODISCOVER=false
 EWS_AUTH_TYPE=basic
 EWS_USERNAME=user@company.com
 EWS_PASSWORD=your-password
+TIMEZONE=UTC
 LOG_LEVEL=INFO
 EOF
 
