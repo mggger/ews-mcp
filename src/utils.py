@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 import logging
 import os
-from exchangelib import EWSTimeZone, EWSDateTime
+from exchangelib import EWSTimeZone, EWSDateTime, EWSDate
 import pytz
 
 
@@ -79,6 +79,31 @@ def parse_datetime_tz_aware(dt_str: str) -> EWSDateTime:
 
         # Convert to EWSDateTime with configured timezone
         return make_tz_aware(dt)
+    except ValueError:
+        return None
+
+
+def parse_date_tz_aware(date_str: str) -> EWSDate:
+    """Parse ISO 8601 date/datetime string and return as EWSDate.
+
+    Used for task due_date and start_date fields which only accept EWSDate, not EWSDateTime.
+    Accepts both date-only strings (2025-11-15) and full datetime strings (2025-11-15T17:00:00+03:00).
+    """
+    if not date_str:
+        return None
+
+    try:
+        # Parse the datetime string (works for both date and datetime formats)
+        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+
+        # Convert timezone-aware datetime to target timezone if needed
+        if dt.tzinfo is not None:
+            tz_name = os.environ.get('TIMEZONE', os.environ.get('TZ', 'UTC'))
+            target_tz = pytz.timezone(tz_name)
+            dt = dt.astimezone(target_tz)
+
+        # Create EWSDate from the date components only (no time)
+        return EWSDate(dt.year, dt.month, dt.day)
     except ValueError:
         return None
 
