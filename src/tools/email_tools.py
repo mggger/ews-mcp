@@ -8,7 +8,7 @@ from exchangelib.queryset import Q
 from .base import BaseTool
 from ..models import SendEmailRequest, EmailSearchRequest, EmailDetails
 from ..exceptions import ToolExecutionError
-from ..utils import format_success_response, safe_get, truncate_text
+from ..utils import format_success_response, safe_get, truncate_text, parse_datetime_tz_aware
 
 
 class SendEmailTool(BaseTool):
@@ -275,11 +275,11 @@ class SearchEmailsTool(BaseTool):
                 query = query.filter(is_read=kwargs["is_read"])
 
             if kwargs.get("start_date"):
-                start = datetime.fromisoformat(kwargs["start_date"])
+                start = parse_datetime_tz_aware(kwargs["start_date"])
                 query = query.filter(datetime_received__gte=start)
 
             if kwargs.get("end_date"):
-                end = datetime.fromisoformat(kwargs["end_date"])
+                end = parse_datetime_tz_aware(kwargs["end_date"])
                 query = query.filter(datetime_received__lte=end)
 
             # Order and limit

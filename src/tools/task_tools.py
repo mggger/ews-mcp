@@ -7,7 +7,7 @@ from exchangelib import Task
 from .base import BaseTool
 from ..models import CreateTaskRequest
 from ..exceptions import ToolExecutionError
-from ..utils import format_success_response, safe_get
+from ..utils import format_success_response, safe_get, parse_datetime_tz_aware
 
 
 class CreateTaskTool(BaseTool):
@@ -53,15 +53,15 @@ class CreateTaskTool(BaseTool):
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Create task."""
-        # Parse datetime strings
+        # Parse datetime strings as timezone-aware
         if "due_date" in kwargs and kwargs["due_date"]:
-            kwargs["due_date"] = datetime.fromisoformat(kwargs["due_date"])
+            kwargs["due_date"] = parse_datetime_tz_aware(kwargs["due_date"])
 
         if "start_date" in kwargs and kwargs["start_date"]:
-            kwargs["start_date"] = datetime.fromisoformat(kwargs["start_date"])
+            kwargs["start_date"] = parse_datetime_tz_aware(kwargs["start_date"])
 
         if "reminder_time" in kwargs and kwargs["reminder_time"]:
-            kwargs["reminder_time"] = datetime.fromisoformat(kwargs["reminder_time"])
+            kwargs["reminder_time"] = parse_datetime_tz_aware(kwargs["reminder_time"])
 
         # Validate input
         request = self.validate_input(CreateTaskRequest, **kwargs)
@@ -234,7 +234,7 @@ class UpdateTaskTool(BaseTool):
                 task.body = kwargs["body"]
 
             if "due_date" in kwargs:
-                task.due_date = datetime.fromisoformat(kwargs["due_date"])
+                task.due_date = parse_datetime_tz_aware(kwargs["due_date"])
 
             if "percent_complete" in kwargs:
                 task.percent_complete = kwargs["percent_complete"]
