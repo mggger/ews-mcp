@@ -47,11 +47,11 @@ class EWSClient:
 
             # Get timezone - use EWSTimeZone from exchangelib
             try:
-                tz = EWSTimeZone.timezone(self.config.timezone)
+                tz = EWSTimeZone(self.config.timezone)
                 self.logger.info(f"Successfully loaded timezone: {self.config.timezone}")
             except Exception as e:
                 self.logger.warning(f"Failed to load timezone {self.config.timezone}, falling back to UTC: {e}")
-                tz = EWSTimeZone.timezone('UTC')
+                tz = EWSTimeZone('UTC')
 
             # Use autodiscovery or manual configuration
             if self.config.ews_autodiscover:

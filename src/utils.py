@@ -13,10 +13,10 @@ def get_timezone():
     # Get timezone from environment or default to UTC
     tz_name = os.environ.get('TIMEZONE', os.environ.get('TZ', 'UTC'))
     try:
-        return EWSTimeZone.timezone(tz_name)
+        return EWSTimeZone(tz_name)
     except Exception:
         # Fallback to UTC if timezone not found
-        return EWSTimeZone.timezone('UTC')
+        return EWSTimeZone('UTC')
 
 
 def get_pytz_timezone():
