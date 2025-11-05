@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 import logging
 import os
-from exchangelib import EWSTimeZone
+from exchangelib import EWSTimeZone, EWSDateTime
 import pytz
 
 
@@ -28,30 +28,45 @@ def get_pytz_timezone():
         return pytz.UTC
 
 
-def make_tz_aware(dt: datetime) -> datetime:
-    """Make a naive datetime timezone-aware using configured timezone."""
-    if dt.tzinfo is not None:
-        # Already timezone-aware
+def make_tz_aware(dt: datetime) -> EWSDateTime:
+    """Make a naive datetime timezone-aware as EWSDateTime with EWSTimeZone.
+
+    This is the correct way to create datetime objects for exchangelib.
+    """
+    if isinstance(dt, EWSDateTime):
+        # Already EWSDateTime
         return dt
 
-    tz = get_pytz_timezone()
-    return tz.localize(dt)
+    tz = get_timezone()
+
+    if dt.tzinfo is not None:
+        # Already timezone-aware, convert to EWSDateTime
+        return EWSDateTime.from_datetime(dt).replace(tzinfo=tz)
+
+    # Naive datetime - create EWSDateTime with configured timezone
+    # Create as UTC-aware first, then localize to target timezone
+    return EWSDateTime(
+        dt.year, dt.month, dt.day,
+        dt.hour, dt.minute, dt.second,
+        dt.microsecond,
+        tzinfo=tz
+    )
 
 
-def parse_datetime_tz_aware(dt_str: str) -> datetime:
-    """Parse ISO 8601 datetime string and make it timezone-aware."""
+def parse_datetime_tz_aware(dt_str: str) -> EWSDateTime:
+    """Parse ISO 8601 datetime string and return as EWSDateTime with EWSTimeZone.
+
+    This ensures all datetime objects used with exchangelib have the correct timezone format.
+    """
     if not dt_str:
         return None
 
     try:
-        # Parse the datetime
+        # Parse the datetime string
         dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
 
-        # Make timezone-aware if naive
-        if dt.tzinfo is None:
-            dt = make_tz_aware(dt)
-
-        return dt
+        # Convert to EWSDateTime with configured timezone
+        return make_tz_aware(dt)
     except ValueError:
         return None
 
