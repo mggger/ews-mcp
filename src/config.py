@@ -1,7 +1,7 @@
 """Configuration management for EWS MCP Server."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator
+from pydantic import Field, model_validator
 from typing import Literal, Optional
 
 
@@ -55,22 +55,23 @@ class Settings(BaseSettings):
     enable_audit_log: bool = True
     max_attachment_size: int = 157286400  # 150MB
 
-    @field_validator("ews_auth_type")
-    @classmethod
-    def validate_auth_credentials(cls, v: str, info) -> str:
+    @model_validator(mode='after')
+    def validate_auth_credentials(self) -> 'Settings':
         """Validate required credentials based on auth type."""
-        values = info.data
-
-        if v == "oauth2":
-            required = ["ews_client_id", "ews_client_secret", "ews_tenant_id"]
-            missing = [f for f in required if not values.get(f)]
+        if self.ews_auth_type == "oauth2":
+            required = {
+                "ews_client_id": self.ews_client_id,
+                "ews_client_secret": self.ews_client_secret,
+                "ews_tenant_id": self.ews_tenant_id
+            }
+            missing = [name for name, value in required.items() if not value]
             if missing:
                 raise ValueError(f"OAuth2 auth requires: {', '.join(missing)}")
-        elif v in ("basic", "ntlm"):
-            if not values.get("ews_username") or not values.get("ews_password"):
-                raise ValueError(f"{v.upper()} auth requires ews_username and ews_password")
+        elif self.ews_auth_type in ("basic", "ntlm"):
+            if not self.ews_username or not self.ews_password:
+                raise ValueError(f"{self.ews_auth_type.upper()} auth requires ews_username and ews_password")
 
-        return v
+        return self
 
 
 # Singleton instance - lazy loading
