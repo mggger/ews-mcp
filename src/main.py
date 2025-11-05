@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import sys
 from typing import Any
 
@@ -39,6 +40,15 @@ class EWSMCPServer:
     def __init__(self):
         # Get settings (lazy loading)
         self.settings = get_settings()
+
+        # Set timezone
+        os.environ['TZ'] = self.settings.timezone
+        try:
+            import time
+            time.tzset()
+        except AttributeError:
+            # tzset not available on Windows
+            pass
 
         # Set up logging
         setup_logging(self.settings.log_level)

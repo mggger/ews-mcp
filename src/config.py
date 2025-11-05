@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     mcp_transport: Literal["stdio", "sse"] = "stdio"
     mcp_host: str = "0.0.0.0"
     mcp_port: int = 8000
+    timezone: str = "UTC"
     log_level: str = "INFO"
 
     # Performance

@@ -50,6 +50,9 @@ MCP_TRANSPORT=sse
 MCP_HOST=0.0.0.0
 MCP_PORT=8000
 
+# Timezone (important for correct email timestamps!)
+TIMEZONE=America/New_York
+
 # Optional Settings
 LOG_LEVEL=INFO
 ENABLE_EMAIL=true
@@ -117,6 +120,7 @@ EWS_TENANT_ID=87654321-4321-4321-4321-cba987654321
 | Variable | Default | Options | Description |
 |----------|---------|---------|-------------|
 | `EWS_SERVER_URL` | (auto) | URL | Exchange server URL |
+| `TIMEZONE` | `UTC` | Any TZ name | Timezone for email timestamps (e.g., America/New_York, Europe/London, Asia/Tokyo) |
 | `LOG_LEVEL` | `INFO` | DEBUG, INFO, WARNING, ERROR | Logging level |
 | `ENABLE_EMAIL` | `true` | true/false | Enable email tools |
 | `ENABLE_CALENDAR` | `true` | true/false | Enable calendar tools |
@@ -296,6 +300,60 @@ docker run -d \
 
 # View logs:
 docker logs -f ews-mcp-dev
+```
+
+---
+
+## 🌍 Timezone Configuration
+
+**Why it matters:** Exchange email timestamps are affected by timezone. If you see incorrect times, set your local timezone.
+
+### Common Timezones
+
+```bash
+# United States
+TIMEZONE=America/New_York      # Eastern Time
+TIMEZONE=America/Chicago       # Central Time
+TIMEZONE=America/Denver        # Mountain Time
+TIMEZONE=America/Los_Angeles   # Pacific Time
+
+# Europe
+TIMEZONE=Europe/London         # UK
+TIMEZONE=Europe/Paris          # France/Spain/Germany
+TIMEZONE=Europe/Berlin         # Central Europe
+TIMEZONE=Europe/Moscow         # Russia
+
+# Asia
+TIMEZONE=Asia/Tokyo            # Japan
+TIMEZONE=Asia/Shanghai         # China
+TIMEZONE=Asia/Dubai            # UAE
+TIMEZONE=Asia/Kolkata          # India
+
+# Other
+TIMEZONE=Australia/Sydney      # Australia
+TIMEZONE=Pacific/Auckland      # New Zealand
+```
+
+### Example with Timezone
+
+```bash
+docker run -d \
+  --name ews-mcp \
+  -p 8000:8000 \
+  -e MCP_TRANSPORT=sse \
+  -e EWS_EMAIL=john.doe@company.com \
+  -e EWS_AUTH_TYPE=basic \
+  -e EWS_USERNAME=john.doe@company.com \
+  -e EWS_PASSWORD=YourPassword123 \
+  -e TIMEZONE=America/New_York \
+  ghcr.io/azizmazrou/ews-mcp-server:latest
+```
+
+### List All Available Timezones
+
+```bash
+docker run --rm ghcr.io/azizmazrou/ews-mcp-server:latest \
+  ls /usr/share/zoneinfo/
 ```
 
 ---
