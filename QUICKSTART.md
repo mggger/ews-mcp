@@ -327,6 +327,7 @@ TIMEZONE=Europe/Moscow         # Russia
 TIMEZONE=Asia/Tokyo            # Japan
 TIMEZONE=Asia/Shanghai         # China
 TIMEZONE=Asia/Dubai            # UAE
+TIMEZONE=Asia/Riyadh           # Saudi Arabia (tested and verified)
 TIMEZONE=Asia/Kolkata          # India
 
 # Other
