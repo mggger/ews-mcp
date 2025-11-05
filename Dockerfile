@@ -59,5 +59,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Switch to non-root user
 USER mcp
 
+# Expose port for HTTP/SSE transport (optional, only used when MCP_TRANSPORT=sse)
+EXPOSE 8000
+
 # Run server (use CMD for easy override in tests)
 CMD ["python", "-m", "src.main"]

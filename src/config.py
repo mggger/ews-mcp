@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # Server configuration
     mcp_server_name: str = "ews-mcp-server"
     mcp_transport: Literal["stdio", "sse"] = "stdio"
+    mcp_host: str = "0.0.0.0"
+    mcp_port: int = 8000
     log_level: str = "INFO"
 
     # Performance

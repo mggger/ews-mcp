@@ -7,7 +7,10 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
+from mcp.server.sse import SseServerTransport
 from mcp.types import Tool, TextContent
+from starlette.applications import Starlette
+from starlette.routing import Route
 
 from .config import get_settings
 from .auth import AuthHandler
@@ -207,15 +210,18 @@ class EWSMCPServer:
             # Register tools
             self.register_tools()
 
-            # Start server
-            self.logger.info(f"Server ready - listening on stdio")
-
-            async with stdio_server() as (read_stream, write_stream):
-                await self.server.run(
-                    read_stream,
-                    write_stream,
-                    self.server.create_initialization_options()
-                )
+            # Start server based on transport type
+            if self.settings.mcp_transport == "stdio":
+                self.logger.info(f"Server ready - listening on stdio")
+                async with stdio_server() as (read_stream, write_stream):
+                    await self.server.run(
+                        read_stream,
+                        write_stream,
+                        self.server.create_initialization_options()
+                    )
+            elif self.settings.mcp_transport == "sse":
+                self.logger.info(f"Server ready - listening on http://{self.settings.mcp_host}:{self.settings.mcp_port}")
+                await self.run_sse()
 
         except KeyboardInterrupt:
             self.logger.info("Shutting down...")
@@ -226,6 +232,49 @@ class EWSMCPServer:
             # Cleanup
             self.ews_client.close()
             self.logger.info("Server stopped")
+
+    async def run_sse(self):
+        """Run the MCP server with SSE (HTTP) transport."""
+        from starlette.responses import Response
+        import uvicorn
+
+        sse = SseServerTransport("/messages")
+
+        async def handle_sse(request):
+            async with sse.connect_sse(
+                request.scope,
+                request.receive,
+                request._send,
+            ) as streams:
+                await self.server.run(
+                    streams[0],
+                    streams[1],
+                    self.server.create_initialization_options(),
+                )
+            return Response()
+
+        async def handle_messages(request):
+            await sse.handle_post_message(request.scope, request.receive, request._send)
+            return Response()
+
+        # Create Starlette app
+        app = Starlette(
+            debug=True,
+            routes=[
+                Route("/sse", endpoint=handle_sse),
+                Route("/messages", endpoint=handle_messages, methods=["POST"]),
+            ],
+        )
+
+        # Run with uvicorn
+        config = uvicorn.Config(
+            app,
+            host=self.settings.mcp_host,
+            port=self.settings.mcp_port,
+            log_level=self.settings.log_level.lower(),
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
 
 
 def main():
