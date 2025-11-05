@@ -147,15 +147,16 @@ class SearchContactsTool(BaseTool):
                     break
 
                 # Check if query matches
-                given_name = safe_get(item, "given_name", "")
-                surname = safe_get(item, "surname", "")
-                display_name = safe_get(item, "display_name", "")
+                given_name = safe_get(item, "given_name", "") or ""
+                surname = safe_get(item, "surname", "") or ""
+                display_name = safe_get(item, "display_name", "") or ""
                 email_addrs = safe_get(item, "email_addresses", [])
 
                 # Get email from list
                 email = ""
                 if email_addrs:
                     email = email_addrs[0].email if hasattr(email_addrs[0], 'email') else ""
+                email = email or ""  # Ensure email is never None
 
                 # Match query
                 query_lower = query.lower()
@@ -166,12 +167,12 @@ class SearchContactsTool(BaseTool):
 
                     contact_data = {
                         "item_id": safe_get(item, "id", "unknown"),
-                        "display_name": display_name or f"{given_name} {surname}",
+                        "display_name": display_name or f"{given_name} {surname}".strip(),
                         "given_name": given_name,
                         "surname": surname,
                         "email": email,
-                        "company": safe_get(item, "company_name", ""),
-                        "job_title": safe_get(item, "job_title", "")
+                        "company": safe_get(item, "company_name", "") or "",
+                        "job_title": safe_get(item, "job_title", "") or ""
                     }
                     contacts.append(contact_data)
                     count += 1
@@ -218,23 +219,24 @@ class GetContactsTool(BaseTool):
 
             contacts = []
             for item in items:
-                given_name = safe_get(item, "given_name", "")
-                surname = safe_get(item, "surname", "")
-                display_name = safe_get(item, "display_name", "")
+                given_name = safe_get(item, "given_name", "") or ""
+                surname = safe_get(item, "surname", "") or ""
+                display_name = safe_get(item, "display_name", "") or ""
                 email_addrs = safe_get(item, "email_addresses", [])
 
                 email = ""
                 if email_addrs:
                     email = email_addrs[0].email if hasattr(email_addrs[0], 'email') else ""
+                email = email or ""  # Ensure email is never None
 
                 contact_data = {
                     "item_id": safe_get(item, "id", "unknown"),
-                    "display_name": display_name or f"{given_name} {surname}",
+                    "display_name": display_name or f"{given_name} {surname}".strip(),
                     "given_name": given_name,
                     "surname": surname,
                     "email": email,
-                    "company": safe_get(item, "company_name", ""),
-                    "job_title": safe_get(item, "job_title", "")
+                    "company": safe_get(item, "company_name", "") or "",
+                    "job_title": safe_get(item, "job_title", "") or ""
                 }
                 contacts.append(contact_data)
 
