@@ -53,18 +53,7 @@ class CreateTaskTool(BaseTool):
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Create task."""
-        # Parse date strings as EWSDate (due_date and start_date only accept dates, not datetimes)
-        if "due_date" in kwargs and kwargs["due_date"]:
-            kwargs["due_date"] = parse_date_tz_aware(kwargs["due_date"])
-
-        if "start_date" in kwargs and kwargs["start_date"]:
-            kwargs["start_date"] = parse_date_tz_aware(kwargs["start_date"])
-
-        # Parse reminder_time as EWSDateTime (this accepts datetime)
-        if "reminder_time" in kwargs and kwargs["reminder_time"]:
-            kwargs["reminder_time"] = parse_datetime_tz_aware(kwargs["reminder_time"])
-
-        # Validate input
+        # Validate input first (Pydantic expects datetime types)
         request = self.validate_input(CreateTaskRequest, **kwargs)
 
         try:
@@ -79,17 +68,19 @@ class CreateTaskTool(BaseTool):
             if request.body:
                 task.body = request.body
 
+            # Convert datetime to EWSDate for date-only fields
             if request.due_date:
-                task.due_date = request.due_date
+                task.due_date = parse_date_tz_aware(request.due_date.isoformat())
 
             if request.start_date:
-                task.start_date = request.start_date
+                task.start_date = parse_date_tz_aware(request.start_date.isoformat())
 
             task.importance = request.importance.value
 
+            # Convert datetime to EWSDateTime for datetime fields
             if request.reminder_time:
                 task.reminder_is_set = True
-                task.reminder_due_by = request.reminder_time
+                task.reminder_due_by = parse_datetime_tz_aware(request.reminder_time.isoformat())
 
             # Save task
             task.save()
@@ -235,7 +226,13 @@ class UpdateTaskTool(BaseTool):
                 task.body = kwargs["body"]
 
             if "due_date" in kwargs:
-                task.due_date = parse_date_tz_aware(kwargs["due_date"])
+                # Convert string to EWSDate for date-only field
+                due_date_str = kwargs["due_date"]
+                if isinstance(due_date_str, str):
+                    task.due_date = parse_date_tz_aware(due_date_str)
+                else:
+                    # If it's already a datetime object from somewhere else
+                    task.due_date = parse_date_tz_aware(due_date_str.isoformat())
 
             if "percent_complete" in kwargs:
                 task.percent_complete = kwargs["percent_complete"]
