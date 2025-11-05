@@ -251,6 +251,7 @@ class EWSMCPServer:
         sse = SseServerTransport("/messages")
 
         async def handle_sse(request):
+            """Handle SSE connection endpoint."""
             async with sse.connect_sse(
                 request.scope,
                 request.receive,
@@ -263,9 +264,14 @@ class EWSMCPServer:
                 )
             return Response()
 
-        async def handle_messages(request):
-            await sse.handle_post_message(request.scope, request.receive, request._send)
-            return Response()
+        async def handle_messages(scope, receive, send):
+            """Handle POST messages endpoint - ASGI interface.
+
+            Note: This is a raw ASGI endpoint (not a Starlette Request endpoint)
+            because handle_post_message needs direct access to scope/receive/send.
+            It sends its own HTTP response (202 Accepted), so we don't return anything.
+            """
+            await sse.handle_post_message(scope, receive, send)
 
         # Create Starlette app
         app = Starlette(
