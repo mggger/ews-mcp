@@ -1,7 +1,8 @@
 """Contact operation tools for EWS MCP Server."""
 
 from typing import Any, Dict
-from exchangelib import Contact, EmailAddress
+from exchangelib import Contact
+from exchangelib.indexed_properties import EmailAddress
 
 from .base import BaseTool
 from ..models import CreateContactRequest
