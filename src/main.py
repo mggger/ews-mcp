@@ -20,6 +20,7 @@ from .middleware.logging import setup_logging, AuditLogger
 from .middleware.error_handler import ErrorHandler
 from .middleware.rate_limiter import RateLimiter
 from .exceptions import EWSMCPException
+from .logging_system import get_logger
 
 # Import all tool classes
 from .tools import (
@@ -35,7 +36,7 @@ from .tools import (
 
 
 class EWSMCPServer:
-    """MCP Server for Exchange Web Services."""
+    """MCP Server for Exchange Web Services with comprehensive logging."""
 
     def __init__(self):
         # Get settings (lazy loading)
@@ -53,6 +54,9 @@ class EWSMCPServer:
         # Set up logging
         setup_logging(self.settings.log_level)
         self.logger = logging.getLogger(__name__)
+
+        # Initialize comprehensive logging system
+        self.log_manager = get_logger()
 
         # Initialize server
         self.server = Server(self.settings.mcp_server_name)
@@ -73,6 +77,30 @@ class EWSMCPServer:
 
         # Register handlers
         self._register_handlers()
+
+        # Log server initialization
+        self.log_manager.log_activity(
+            level="INFO",
+            module="main",
+            action="SERVER_INIT",
+            data={
+                "version": "1.0.0",
+                "user": self.settings.ews_email,
+                "auth_type": self.settings.ews_auth_type,
+                "server_url": self.settings.ews_server_url or "autodiscover"
+            },
+            result={"status": "initializing"},
+            context={
+                "timezone": self.settings.timezone,
+                "transport": self.settings.mcp_transport,
+                "features": {
+                    "email": self.settings.enable_email,
+                    "calendar": self.settings.enable_calendar,
+                    "contacts": self.settings.enable_contacts,
+                    "tasks": self.settings.enable_tasks
+                }
+            }
+        )
 
     def _register_handlers(self):
         """Register MCP protocol handlers."""
@@ -201,7 +229,7 @@ class EWSMCPServer:
         self.logger.info(f"Registered {len(self.tools)} tools: {', '.join(self.tools.keys())}")
 
     async def run(self):
-        """Run the MCP server."""
+        """Run the MCP server with comprehensive logging."""
         try:
             self.logger.info(f"Starting {self.settings.mcp_server_name}")
             self.logger.info(f"Server: {self.settings.ews_server_url or 'autodiscover'}")
@@ -213,12 +241,45 @@ class EWSMCPServer:
             if not self.ews_client.test_connection():
                 self.logger.error("Failed to connect to Exchange server")
                 self.logger.error("Please check your configuration and credentials")
+
+                # Log connection failure
+                self.log_manager.log_activity(
+                    level="ERROR",
+                    module="main",
+                    action="CONNECTION_FAILED",
+                    data={"server": self.settings.ews_server_url or "autodiscover"},
+                    result={"status": "failed"},
+                    context={"auth_type": self.settings.ews_auth_type}
+                )
                 return
 
             self.logger.info("✓ Successfully connected to Exchange")
 
+            # Log successful connection
+            self.log_manager.log_activity(
+                level="INFO",
+                module="main",
+                action="CONNECTION_SUCCESS",
+                data={"server": self.settings.ews_server_url or "autodiscover"},
+                result={"status": "connected"},
+                context={"auth_type": self.settings.ews_auth_type}
+            )
+
             # Register tools
             self.register_tools()
+
+            # Log server ready
+            self.log_manager.log_activity(
+                level="INFO",
+                module="main",
+                action="SERVER_READY",
+                data={"registered_tools": len(self.tools)},
+                result={"status": "ready"},
+                context={
+                    "tool_list": list(self.tools.keys()),
+                    "transport": self.settings.mcp_transport
+                }
+            )
 
             # Start server based on transport type
             if self.settings.mcp_transport == "stdio":

@@ -49,8 +49,14 @@ WORKDIR /app
 # Copy Python virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 
+# Create logs directory with proper permissions (before switching user)
+RUN mkdir -p /app/logs/analysis && chown -R mcp:mcp /app/logs
+
 # Copy application code
 COPY --chown=mcp:mcp src/ ./src/
+
+# Copy scripts
+COPY --chown=mcp:mcp scripts/ ./scripts/
 
 # Set environment
 ENV PATH="/opt/venv/bin:$PATH"

@@ -171,18 +171,29 @@ class GetCalendarTool(BaseTool):
             # Format events
             events = []
             for item in items[:max_results]:
+                # Get organizer email safely
+                organizer = safe_get(item, "organizer", None)
+                organizer_email = ""
+                if organizer and hasattr(organizer, "email_address"):
+                    organizer_email = organizer.email_address or ""
+
+                # Get attendees safely - filter out None values
+                required_attendees = safe_get(item, "required_attendees", []) or []
+                attendee_emails = [
+                    att.mailbox.email_address
+                    for att in required_attendees
+                    if att and hasattr(att, "mailbox") and att.mailbox and hasattr(att.mailbox, "email_address") and att.mailbox.email_address
+                ]
+
                 event_data = {
                     "item_id": safe_get(item, "id", "unknown"),
-                    "subject": safe_get(item, "subject", ""),
+                    "subject": safe_get(item, "subject", "") or "",
                     "start": safe_get(item, "start", datetime.now()).isoformat(),
                     "end": safe_get(item, "end", datetime.now()).isoformat(),
-                    "location": safe_get(item, "location", ""),
-                    "organizer": safe_get(item, "organizer", {}).email_address if hasattr(item, "organizer") else "",
+                    "location": safe_get(item, "location", "") or "",
+                    "organizer": organizer_email,
                     "is_all_day": safe_get(item, "is_all_day", False),
-                    "attendees": [
-                        att.mailbox.email_address
-                        for att in safe_get(item, "required_attendees", [])
-                    ]
+                    "attendees": attendee_emails
                 }
                 events.append(event_data)
 
@@ -311,7 +322,11 @@ class DeleteAppointmentTool(BaseTool):
             # Get and delete the appointment
             item = self.ews_client.account.calendar.get(id=item_id)
 
-            if send_cancellation and hasattr(item, "required_attendees") and item.required_attendees:
+            # Check if we should send cancellation
+            required_attendees = safe_get(item, "required_attendees", []) or []
+            has_attendees = len(required_attendees) > 0
+
+            if send_cancellation and has_attendees:
                 item.cancel()
             else:
                 item.delete()

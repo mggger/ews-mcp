@@ -142,12 +142,12 @@ class GetTasksTool(BaseTool):
             for item in items[:max_results]:
                 task_data = {
                     "item_id": safe_get(item, "id", "unknown"),
-                    "subject": safe_get(item, "subject", ""),
-                    "status": safe_get(item, "status", "NotStarted"),
+                    "subject": safe_get(item, "subject", "") or "",
+                    "status": safe_get(item, "status", "NotStarted") or "NotStarted",
                     "percent_complete": safe_get(item, "percent_complete", 0),
                     "is_complete": safe_get(item, "is_complete", False),
                     "due_date": safe_get(item, "due_date", None),
-                    "importance": safe_get(item, "importance", "Normal")
+                    "importance": safe_get(item, "importance", "Normal") or "Normal"
                 }
 
                 # Format due date

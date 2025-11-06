@@ -1,24 +1,26 @@
 {
   "mcpServers": {
     "ews": {
-      "comment": "EWS MCP Server - Pre-built image from GHCR (Recommended)",
+      "comment": "EWS MCP Server - Pre-built image from GHCR (Recommended) with log volume",
       "command": "docker",
       "args": [
         "run",
         "-i",
         "--rm",
+        "-v", "/absolute/path/to/logs:/app/logs",
         "--env-file",
         "/absolute/path/to/.env",
         "ghcr.io/azizmazrou/ews-mcp:latest"
       ]
     },
     "ews-local-build": {
-      "comment": "EWS MCP Server - Locally built image with timezone support",
+      "comment": "EWS MCP Server - Locally built image with timezone support and logs",
       "command": "docker",
       "args": [
         "run",
         "-i",
         "--rm",
+        "-v", "/absolute/path/to/ews-mcp/logs:/app/logs",
         "--env-file",
         "/absolute/path/to/ews-mcp/.env",
         "ews-mcp-server"
