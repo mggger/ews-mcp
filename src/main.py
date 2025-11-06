@@ -325,9 +325,10 @@ class EWSMCPServer:
                 )
             return Response()
 
-        async def handle_messages(scope, receive, send):
-            """Handle POST messages endpoint (ASGI app)."""
-            await sse.handle_post_message(scope, receive, send)
+        async def handle_messages(request):
+            """Handle POST messages endpoint."""
+            await sse.handle_post_message(request.scope, request.receive, request._send)
+            return Response()
 
         # Create Starlette app
         app = Starlette(
