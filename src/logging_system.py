@@ -26,7 +26,14 @@ class LogManager:
 
     def setup_logging(self):
         """Initialize all log files and handlers."""
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError as e:
+            logging.warning(f"Cannot create log directory {self.log_dir}: {e}")
+            # Fall back to /tmp if /app/logs is not writable
+            self.log_dir = Path("/tmp/ews_mcp_logs")
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            logging.info(f"Using fallback log directory: {self.log_dir}")
 
         # Create multiple log files
         self.activity_log = self.log_dir / "ews_mcp_activity.log"
@@ -37,7 +44,12 @@ class LogManager:
 
         # Conversation context (JSON, updated in real-time)
         self.context_file = self.log_dir / "analysis" / "conversation_context.json"
-        self.context_file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.context_file.parent.mkdir(parents=True, exist_ok=True)
+        except PermissionError as e:
+            logging.warning(f"Cannot create analysis directory {self.context_file.parent}: {e}")
+            # Disable context file if we can't create the directory
+            self.context_file = None
 
         # Initialize context
         self.conversation_context = {
@@ -54,6 +66,10 @@ class LogManager:
 
     def _save_context(self):
         """Save conversation context to file."""
+        if self.context_file is None:
+            # Context file is disabled due to permissions
+            return
+
         try:
             with open(self.context_file, 'w') as f:
                 json.dump(self.conversation_context, f, indent=2)

@@ -58,6 +58,10 @@ COPY --chown=mcp:mcp src/ ./src/
 # Copy scripts
 COPY --chown=mcp:mcp scripts/ ./scripts/
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Set environment
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
@@ -68,6 +72,9 @@ USER mcp
 
 # Expose port for HTTP/SSE transport (optional, only used when MCP_TRANSPORT=sse)
 EXPOSE 8000
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Run server (use CMD for easy override in tests)
 CMD ["python", "-m", "src.main"]
