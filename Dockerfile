@@ -31,12 +31,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Runtime stage
 FROM python:3.11-slim
 
-# Install runtime dependencies
+# Install runtime dependencies including gosu for user switching
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2 \
     libxslt1.1 \
     ca-certificates \
     tzdata \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -58,7 +59,7 @@ COPY --chown=mcp:mcp src/ ./src/
 # Copy scripts
 COPY --chown=mcp:mcp scripts/ ./scripts/
 
-# Copy entrypoint script
+# Copy entrypoint script (keep as root for now)
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
@@ -67,13 +68,15 @@ ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Switch to non-root user
-USER mcp
+# Note: Container starts as root to allow entrypoint script to:
+# - Create log directories in mounted volumes
+# - Set proper ownership (mcp:mcp)
+# - Then switch to mcp user using gosu before starting the application
 
 # Expose port for HTTP/SSE transport (optional, only used when MCP_TRANSPORT=sse)
 EXPOSE 8000
 
-# Set entrypoint
+# Set entrypoint (runs as root, switches to mcp user internally)
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Run server (use CMD for easy override in tests)

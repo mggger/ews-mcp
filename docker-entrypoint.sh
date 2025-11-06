@@ -16,16 +16,16 @@ if [ ! -d "/app/logs/analysis" ]; then
     mkdir -p /app/logs/analysis
 fi
 
-# Ensure proper ownership (only if we have permission)
-if [ -w "/app/logs" ]; then
-    echo "Setting permissions on /app/logs..."
-    chmod -R 755 /app/logs 2>/dev/null || echo "Warning: Could not set permissions on /app/logs"
-else
-    echo "Warning: /app/logs is not writable. Logs may fail to write."
-fi
+# Set ownership to mcp user (UID 1000, GID 1000)
+echo "Setting ownership on /app/logs to mcp:mcp..."
+chown -R mcp:mcp /app/logs 2>/dev/null || echo "Warning: Could not change ownership (may not be running as root)"
+
+# Ensure proper permissions
+echo "Setting permissions on /app/logs..."
+chmod -R 755 /app/logs 2>/dev/null || echo "Warning: Could not set permissions"
 
 echo "Log directories ready."
-echo "Starting EWS MCP Server..."
+echo "Starting EWS MCP Server as user 'mcp'..."
 
-# Execute the main command
-exec "$@"
+# Switch to mcp user and execute the main command
+exec gosu mcp "$@"
