@@ -19,7 +19,10 @@ The server now includes multiple fixes to handle this gracefully:
 
 1. **Graceful Fallback**: The logging system will now fall back to `/tmp/ews_mcp_logs` if it cannot write to `/app/logs`
 
-2. **Permission Handling**: The entrypoint script (`docker-entrypoint.sh`) ensures log directories exist with proper permissions
+2. **Permission Handling**: The entrypoint script (`docker-entrypoint.sh`) runs as root to:
+   - Create log directories in mounted volumes
+   - Set proper ownership to `mcp:mcp` (UID/GID 1000)
+   - Switch to the non-root `mcp` user using `gosu` before starting the application
 
 3. **Host Directory Creation**: The `logs/analysis` directory structure is now tracked in git with `.gitkeep` files
 
