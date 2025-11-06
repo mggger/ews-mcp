@@ -171,14 +171,23 @@ class ReadEmailsTool(BaseTool):
             # Fetch emails
             emails = []
             for item in items[:max_results]:
+                # Get sender email safely
+                sender = safe_get(item, "sender", None)
+                from_email = ""
+                if sender and hasattr(sender, "email_address"):
+                    from_email = sender.email_address or ""
+
+                # Get text body safely
+                text_body = safe_get(item, "text_body", "") or ""
+
                 email_data = {
                     "message_id": safe_get(item, "id", "unknown"),
-                    "subject": safe_get(item, "subject", ""),
-                    "from": safe_get(item, "sender", {}).email_address if hasattr(item, "sender") else "",
+                    "subject": safe_get(item, "subject", "") or "",
+                    "from": from_email,
                     "received_time": safe_get(item, "datetime_received", datetime.now()).isoformat(),
                     "is_read": safe_get(item, "is_read", False),
                     "has_attachments": safe_get(item, "has_attachments", False),
-                    "preview": truncate_text(safe_get(item, "text_body", ""), 200) if hasattr(item, "text_body") else ""
+                    "preview": truncate_text(text_body, 200)
                 }
                 emails.append(email_data)
 
@@ -289,14 +298,23 @@ class SearchEmailsTool(BaseTool):
             # Fetch results
             emails = []
             for item in query[:max_results]:
+                # Get sender email safely
+                sender = safe_get(item, "sender", None)
+                from_email = ""
+                if sender and hasattr(sender, "email_address"):
+                    from_email = sender.email_address or ""
+
+                # Get text body safely
+                text_body = safe_get(item, "text_body", "") or ""
+
                 email_data = {
                     "message_id": safe_get(item, "id", "unknown"),
-                    "subject": safe_get(item, "subject", ""),
-                    "from": safe_get(item, "sender", {}).email_address if hasattr(item, "sender") else "",
+                    "subject": safe_get(item, "subject", "") or "",
+                    "from": from_email,
                     "received_time": safe_get(item, "datetime_received", datetime.now()).isoformat(),
                     "is_read": safe_get(item, "is_read", False),
                     "has_attachments": safe_get(item, "has_attachments", False),
-                    "preview": truncate_text(safe_get(item, "text_body", ""), 200) if hasattr(item, "text_body") else ""
+                    "preview": truncate_text(text_body, 200)
                 }
                 emails.append(email_data)
 
@@ -340,20 +358,37 @@ class GetEmailDetailsTool(BaseTool):
             # Find message
             item = self.ews_client.account.inbox.get(id=message_id)
 
+            # Get sender email safely
+            sender = safe_get(item, "sender", None)
+            from_email = ""
+            if sender and hasattr(sender, "email_address"):
+                from_email = sender.email_address or ""
+
+            # Get recipients safely
+            to_recipients = safe_get(item, "to_recipients", []) or []
+            to_emails = [r.email_address for r in to_recipients if r and hasattr(r, "email_address") and r.email_address]
+
+            cc_recipients = safe_get(item, "cc_recipients", []) or []
+            cc_emails = [r.email_address for r in cc_recipients if r and hasattr(r, "email_address") and r.email_address]
+
+            # Get attachments safely
+            attachments = safe_get(item, "attachments", []) or []
+            attachment_names = [att.name for att in attachments if att and hasattr(att, "name") and att.name]
+
             email_details = {
                 "message_id": safe_get(item, "id", "unknown"),
-                "subject": safe_get(item, "subject", ""),
-                "from": safe_get(item, "sender", {}).email_address if hasattr(item, "sender") else "",
-                "to": [r.email_address for r in safe_get(item, "to_recipients", [])],
-                "cc": [r.email_address for r in safe_get(item, "cc_recipients", [])],
-                "body": safe_get(item, "text_body", ""),
-                "body_html": str(safe_get(item, "body", "")),
+                "subject": safe_get(item, "subject", "") or "",
+                "from": from_email,
+                "to": to_emails,
+                "cc": cc_emails,
+                "body": safe_get(item, "text_body", "") or "",
+                "body_html": str(safe_get(item, "body", "") or ""),
                 "received_time": safe_get(item, "datetime_received", datetime.now()).isoformat(),
                 "sent_time": safe_get(item, "datetime_sent", datetime.now()).isoformat(),
                 "is_read": safe_get(item, "is_read", False),
                 "has_attachments": safe_get(item, "has_attachments", False),
-                "importance": safe_get(item, "importance", "Normal"),
-                "attachments": [att.name for att in safe_get(item, "attachments", [])]
+                "importance": safe_get(item, "importance", "Normal") or "Normal",
+                "attachments": attachment_names
             }
 
             return format_success_response(

@@ -133,6 +133,8 @@ def sanitize_html(html: str) -> str:
 
 def truncate_text(text: str, max_length: int = 100) -> str:
     """Truncate text to max length."""
+    if text is None or not text:
+        return ""
     if len(text) <= max_length:
         return text
     return text[:max_length - 3] + "..."
