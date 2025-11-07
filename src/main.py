@@ -25,13 +25,16 @@ from .logging_system import get_logger
 # Import all tool classes
 from .tools import (
     SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEmailDetailsTool,
-    DeleteEmailTool, MoveEmailTool,
+    DeleteEmailTool, MoveEmailTool, UpdateEmailTool,
     CreateAppointmentTool, GetCalendarTool, UpdateAppointmentTool,
-    DeleteAppointmentTool, RespondToMeetingTool,
+    DeleteAppointmentTool, RespondToMeetingTool, CheckAvailabilityTool,
     CreateContactTool, SearchContactsTool, GetContactsTool,
-    UpdateContactTool, DeleteContactTool,
+    UpdateContactTool, DeleteContactTool, ResolveNamesTool,
     CreateTaskTool, GetTasksTool, UpdateTaskTool,
-    CompleteTaskTool, DeleteTaskTool
+    CompleteTaskTool, DeleteTaskTool,
+    ListAttachmentsTool, DownloadAttachmentTool,
+    AdvancedSearchTool,
+    ListFoldersTool
 )
 
 
@@ -183,7 +186,10 @@ class EWSMCPServer:
                 SearchEmailsTool,
                 GetEmailDetailsTool,
                 DeleteEmailTool,
-                MoveEmailTool
+                MoveEmailTool,
+                UpdateEmailTool,
+                ListAttachmentsTool,
+                DownloadAttachmentTool
             ])
             self.logger.info("Email tools enabled")
 
@@ -194,7 +200,8 @@ class EWSMCPServer:
                 GetCalendarTool,
                 UpdateAppointmentTool,
                 DeleteAppointmentTool,
-                RespondToMeetingTool
+                RespondToMeetingTool,
+                CheckAvailabilityTool
             ])
             self.logger.info("Calendar tools enabled")
 
@@ -205,7 +212,8 @@ class EWSMCPServer:
                 SearchContactsTool,
                 GetContactsTool,
                 UpdateContactTool,
-                DeleteContactTool
+                DeleteContactTool,
+                ResolveNamesTool
             ])
             self.logger.info("Contact tools enabled")
 
@@ -219,6 +227,13 @@ class EWSMCPServer:
                 DeleteTaskTool
             ])
             self.logger.info("Task tools enabled")
+
+        # Advanced search and folder tools (always enabled)
+        tool_classes.extend([
+            AdvancedSearchTool,
+            ListFoldersTool
+        ])
+        self.logger.info("Search and folder tools enabled")
 
         # Instantiate and register tools
         for tool_class in tool_classes:

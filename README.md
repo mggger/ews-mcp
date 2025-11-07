@@ -399,7 +399,9 @@ docker pull ghcr.io/azizmazrou/ews-mcp:main
 
 ## Available Tools
 
-### Email Tools
+**Total: 28 tools across 6 categories** (⭐ = New in this release)
+
+### Email Tools (9 tools)
 
 - **send_email**: Send emails with attachments and CC/BCC
 - **read_emails**: Read emails from specified folder
@@ -407,30 +409,43 @@ docker pull ghcr.io/azizmazrou/ews-mcp:main
 - **get_email_details**: Get full email details
 - **delete_email**: Delete or permanently remove emails
 - **move_email**: Move emails between folders
+- **update_email**: ⭐ Update email properties (read status, flags, categories, importance)
+- **list_attachments**: ⭐ List all attachments for an email message
+- **download_attachment**: ⭐ Download email attachments (base64 or save to file)
 
-### Calendar Tools
+### Calendar Tools (6 tools)
 
 - **create_appointment**: Schedule meetings with attendees
 - **get_calendar**: Retrieve calendar events
 - **update_appointment**: Modify existing appointments
 - **delete_appointment**: Cancel appointments/meetings
 - **respond_to_meeting**: Accept/decline meeting invitations
+- **check_availability**: ⭐ Get free/busy information for users in a time range
 
-### Contact Tools
+### Contact Tools (6 tools)
 
 - **create_contact**: Add new contacts
 - **search_contacts**: Find contacts by name/email
 - **get_contacts**: List all contacts
 - **update_contact**: Modify contact information
 - **delete_contact**: Remove contacts
+- **resolve_names**: ⭐ Resolve partial names/emails to full contact information
 
-### Task Tools
+### Task Tools (5 tools)
 
 - **create_task**: Create new tasks
 - **get_tasks**: List tasks (filter by status)
 - **update_task**: Modify task details
 - **complete_task**: Mark tasks as complete
 - **delete_task**: Remove tasks
+
+### Search Tools (1 tool)
+
+- **advanced_search**: ⭐ Complex multi-criteria searches across folders with filters
+
+### Folder Tools (1 tool)
+
+- **list_folders**: ⭐ Get mailbox folder hierarchy with details and item counts
 
 ## Testing
 
