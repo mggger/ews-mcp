@@ -615,3 +615,125 @@ class UpdateEmailTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Failed to update email: {e}")
             raise ToolExecutionError(f"Failed to update email: {e}")
+
+
+class CopyEmailTool(BaseTool):
+    """Tool for copying emails to another folder."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "copy_email",
+            "description": "Copy an email to another folder (keeping original in current location)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "message_id": {
+                        "type": "string",
+                        "description": "Email message ID to copy"
+                    },
+                    "destination_folder": {
+                        "type": "string",
+                        "description": "Destination folder name",
+                        "enum": ["inbox", "sent", "drafts", "deleted", "junk", "archive"]
+                    },
+                    "destination_folder_id": {
+                        "type": "string",
+                        "description": "Destination folder ID (alternative to destination_folder)"
+                    }
+                },
+                "required": ["message_id"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Copy email to another folder."""
+        message_id = kwargs.get("message_id")
+        destination_folder_name = kwargs.get("destination_folder")
+        destination_folder_id = kwargs.get("destination_folder_id")
+
+        if not message_id:
+            raise ToolExecutionError("message_id is required")
+
+        if not destination_folder_name and not destination_folder_id:
+            raise ToolExecutionError("Either destination_folder or destination_folder_id is required")
+
+        try:
+            # Find the message in various folders
+            message = None
+            source_folder_name = None
+
+            folders_to_search = [
+                ("inbox", self.ews_client.account.inbox),
+                ("sent", self.ews_client.account.sent),
+                ("drafts", self.ews_client.account.drafts),
+                ("deleted", self.ews_client.account.trash),
+                ("junk", self.ews_client.account.junk)
+            ]
+
+            for folder_name, folder in folders_to_search:
+                try:
+                    message = folder.get(id=message_id)
+                    if message:
+                        source_folder_name = folder_name
+                        break
+                except Exception:
+                    continue
+
+            if not message:
+                raise ToolExecutionError(f"Message not found: {message_id}")
+
+            # Get destination folder
+            if destination_folder_name:
+                folder_map = {
+                    "inbox": self.ews_client.account.inbox,
+                    "sent": self.ews_client.account.sent,
+                    "drafts": self.ews_client.account.drafts,
+                    "deleted": self.ews_client.account.trash,
+                    "junk": self.ews_client.account.junk,
+                    "archive": self.ews_client.account.archive
+                }
+
+                destination_folder = folder_map.get(destination_folder_name.lower())
+                if not destination_folder:
+                    raise ToolExecutionError(f"Unknown destination folder: {destination_folder_name}")
+                dest_name = destination_folder_name
+            else:
+                # Find folder by ID
+                def find_folder_by_id(parent, target_id):
+                    """Recursively search for folder by ID."""
+                    if safe_get(parent, 'id', '') == target_id:
+                        return parent
+
+                    if hasattr(parent, 'children') and parent.children:
+                        for child in parent.children:
+                            result = find_folder_by_id(child, target_id)
+                            if result:
+                                return result
+                    return None
+
+                destination_folder = find_folder_by_id(self.ews_client.account.root, destination_folder_id)
+                if not destination_folder:
+                    raise ToolExecutionError(f"Destination folder not found: {destination_folder_id}")
+                dest_name = safe_get(destination_folder, 'name', 'Unknown')
+
+            # Copy the message (exchangelib uses .copy() method)
+            copied_message = message.copy(to_folder=destination_folder)
+
+            subject = safe_get(message, 'subject', 'No Subject')
+
+            self.logger.info(f"Copied email '{subject}' from {source_folder_name} to {dest_name}")
+
+            return format_success_response(
+                f"Email copied from {source_folder_name} to {dest_name}",
+                message_id=message_id,
+                copied_message_id=safe_get(copied_message, 'id', '') if copied_message else '',
+                subject=subject,
+                source_folder=source_folder_name,
+                destination_folder=dest_name
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to copy email: {e}")
+            raise ToolExecutionError(f"Failed to copy email: {e}")

@@ -1,15 +1,16 @@
 """MCP Tools for EWS operations."""
 
-from .email_tools import SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEmailDetailsTool, DeleteEmailTool, MoveEmailTool, UpdateEmailTool
-from .calendar_tools import CreateAppointmentTool, GetCalendarTool, UpdateAppointmentTool, DeleteAppointmentTool, RespondToMeetingTool, CheckAvailabilityTool
+from .email_tools import SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEmailDetailsTool, DeleteEmailTool, MoveEmailTool, UpdateEmailTool, CopyEmailTool
+from .calendar_tools import CreateAppointmentTool, GetCalendarTool, UpdateAppointmentTool, DeleteAppointmentTool, RespondToMeetingTool, CheckAvailabilityTool, FindMeetingTimesTool
 from .contact_tools import CreateContactTool, SearchContactsTool, GetContactsTool, UpdateContactTool, DeleteContactTool, ResolveNamesTool
 from .task_tools import CreateTaskTool, GetTasksTool, UpdateTaskTool, CompleteTaskTool, DeleteTaskTool
-from .attachment_tools import ListAttachmentsTool, DownloadAttachmentTool
-from .search_tools import AdvancedSearchTool
-from .folder_tools import ListFoldersTool
+from .attachment_tools import ListAttachmentsTool, DownloadAttachmentTool, AddAttachmentTool, DeleteAttachmentTool
+from .search_tools import AdvancedSearchTool, SearchByConversationTool, FullTextSearchTool
+from .folder_tools import ListFoldersTool, CreateFolderTool, DeleteFolderTool, RenameFolderTool, MoveFolderTool
+from .oof_tools import SetOOFSettingsTool, GetOOFSettingsTool
 
 __all__ = [
-    # Email tools
+    # Email tools (8)
     "SendEmailTool",
     "ReadEmailsTool",
     "SearchEmailsTool",
@@ -17,31 +18,44 @@ __all__ = [
     "DeleteEmailTool",
     "MoveEmailTool",
     "UpdateEmailTool",
-    # Calendar tools
+    "CopyEmailTool",
+    # Calendar tools (7)
     "CreateAppointmentTool",
     "GetCalendarTool",
     "UpdateAppointmentTool",
     "DeleteAppointmentTool",
     "RespondToMeetingTool",
     "CheckAvailabilityTool",
-    # Contact tools
+    "FindMeetingTimesTool",
+    # Contact tools (6)
     "CreateContactTool",
     "SearchContactsTool",
     "GetContactsTool",
     "UpdateContactTool",
     "DeleteContactTool",
     "ResolveNamesTool",
-    # Task tools
+    # Task tools (5)
     "CreateTaskTool",
     "GetTasksTool",
     "UpdateTaskTool",
     "CompleteTaskTool",
     "DeleteTaskTool",
-    # Attachment tools
+    # Attachment tools (4)
     "ListAttachmentsTool",
     "DownloadAttachmentTool",
-    # Search tools
+    "AddAttachmentTool",
+    "DeleteAttachmentTool",
+    # Search tools (3)
     "AdvancedSearchTool",
-    # Folder tools
+    "SearchByConversationTool",
+    "FullTextSearchTool",
+    # Folder tools (5)
     "ListFoldersTool",
+    "CreateFolderTool",
+    "DeleteFolderTool",
+    "RenameFolderTool",
+    "MoveFolderTool",
+    # Out-of-Office tools (2)
+    "SetOOFSettingsTool",
+    "GetOOFSettingsTool",
 ]

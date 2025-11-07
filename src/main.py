@@ -22,19 +22,31 @@ from .middleware.rate_limiter import RateLimiter
 from .exceptions import EWSMCPException
 from .logging_system import get_logger
 
-# Import all tool classes
+# Import all tool classes (40 tools total)
 from .tools import (
+    # Email tools (8)
     SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEmailDetailsTool,
-    DeleteEmailTool, MoveEmailTool, UpdateEmailTool,
+    DeleteEmailTool, MoveEmailTool, UpdateEmailTool, CopyEmailTool,
+    # Calendar tools (7)
     CreateAppointmentTool, GetCalendarTool, UpdateAppointmentTool,
     DeleteAppointmentTool, RespondToMeetingTool, CheckAvailabilityTool,
+    FindMeetingTimesTool,
+    # Contact tools (6)
     CreateContactTool, SearchContactsTool, GetContactsTool,
     UpdateContactTool, DeleteContactTool, ResolveNamesTool,
+    # Task tools (5)
     CreateTaskTool, GetTasksTool, UpdateTaskTool,
     CompleteTaskTool, DeleteTaskTool,
+    # Attachment tools (4)
     ListAttachmentsTool, DownloadAttachmentTool,
-    AdvancedSearchTool,
-    ListFoldersTool
+    AddAttachmentTool, DeleteAttachmentTool,
+    # Search tools (3)
+    AdvancedSearchTool, SearchByConversationTool, FullTextSearchTool,
+    # Folder tools (5)
+    ListFoldersTool, CreateFolderTool, DeleteFolderTool,
+    RenameFolderTool, MoveFolderTool,
+    # Out-of-Office tools (2)
+    SetOOFSettingsTool, GetOOFSettingsTool
 )
 
 
@@ -175,10 +187,10 @@ class EWSMCPServer:
                 )]
 
     def register_tools(self):
-        """Register all enabled tools."""
+        """Register all enabled tools (40 total)."""
         tool_classes = []
 
-        # Email tools
+        # Email tools (8 tools)
         if self.settings.enable_email:
             tool_classes.extend([
                 SendEmailTool,
@@ -188,12 +200,21 @@ class EWSMCPServer:
                 DeleteEmailTool,
                 MoveEmailTool,
                 UpdateEmailTool,
-                ListAttachmentsTool,
-                DownloadAttachmentTool
+                CopyEmailTool
             ])
-            self.logger.info("Email tools enabled")
+            self.logger.info("Email tools enabled (8 tools)")
 
-        # Calendar tools
+        # Attachment tools (4 tools - email-related)
+        if self.settings.enable_email:
+            tool_classes.extend([
+                ListAttachmentsTool,
+                DownloadAttachmentTool,
+                AddAttachmentTool,
+                DeleteAttachmentTool
+            ])
+            self.logger.info("Attachment tools enabled (4 tools)")
+
+        # Calendar tools (7 tools)
         if self.settings.enable_calendar:
             tool_classes.extend([
                 CreateAppointmentTool,
@@ -201,11 +222,12 @@ class EWSMCPServer:
                 UpdateAppointmentTool,
                 DeleteAppointmentTool,
                 RespondToMeetingTool,
-                CheckAvailabilityTool
+                CheckAvailabilityTool,
+                FindMeetingTimesTool
             ])
-            self.logger.info("Calendar tools enabled")
+            self.logger.info("Calendar tools enabled (7 tools)")
 
-        # Contact tools
+        # Contact tools (6 tools)
         if self.settings.enable_contacts:
             tool_classes.extend([
                 CreateContactTool,
@@ -215,9 +237,9 @@ class EWSMCPServer:
                 DeleteContactTool,
                 ResolveNamesTool
             ])
-            self.logger.info("Contact tools enabled")
+            self.logger.info("Contact tools enabled (6 tools)")
 
-        # Task tools
+        # Task tools (5 tools)
         if self.settings.enable_tasks:
             tool_classes.extend([
                 CreateTaskTool,
@@ -226,14 +248,32 @@ class EWSMCPServer:
                 CompleteTaskTool,
                 DeleteTaskTool
             ])
-            self.logger.info("Task tools enabled")
+            self.logger.info("Task tools enabled (5 tools)")
 
-        # Advanced search and folder tools (always enabled)
+        # Search tools (3 tools - always enabled)
         tool_classes.extend([
             AdvancedSearchTool,
-            ListFoldersTool
+            SearchByConversationTool,
+            FullTextSearchTool
         ])
-        self.logger.info("Search and folder tools enabled")
+        self.logger.info("Search tools enabled (3 tools)")
+
+        # Folder tools (5 tools - always enabled)
+        tool_classes.extend([
+            ListFoldersTool,
+            CreateFolderTool,
+            DeleteFolderTool,
+            RenameFolderTool,
+            MoveFolderTool
+        ])
+        self.logger.info("Folder tools enabled (5 tools)")
+
+        # Out-of-Office tools (2 tools - always enabled)
+        tool_classes.extend([
+            SetOOFSettingsTool,
+            GetOOFSettingsTool
+        ])
+        self.logger.info("Out-of-Office tools enabled (2 tools)")
 
         # Instantiate and register tools
         for tool_class in tool_classes:
