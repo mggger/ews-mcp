@@ -531,3 +531,216 @@ class CheckAvailabilityTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Failed to check availability: {e}")
             raise ToolExecutionError(f"Failed to check availability: {e}")
+
+
+class FindMeetingTimesTool(BaseTool):
+    """Tool for finding optimal meeting times using AI-powered scheduling."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "find_meeting_times",
+            "description": "Find optimal meeting times based on attendee availability and preferences",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "attendees": {
+                        "type": "array",
+                        "description": "List of attendee email addresses",
+                        "items": {"type": "string"}
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "description": "Meeting duration in minutes",
+                        "default": 60,
+                        "minimum": 15,
+                        "maximum": 480
+                    },
+                    "date_range_start": {
+                        "type": "string",
+                        "description": "Start of date range to search (ISO 8601 format)"
+                    },
+                    "date_range_end": {
+                        "type": "string",
+                        "description": "End of date range to search (ISO 8601 format)"
+                    },
+                    "max_suggestions": {
+                        "type": "integer",
+                        "description": "Maximum number of time suggestions",
+                        "default": 5,
+                        "minimum": 1,
+                        "maximum": 20
+                    },
+                    "preferences": {
+                        "type": "object",
+                        "description": "Scheduling preferences",
+                        "properties": {
+                            "prefer_morning": {"type": "boolean", "default": False},
+                            "prefer_afternoon": {"type": "boolean", "default": False},
+                            "avoid_back_to_back": {"type": "boolean", "default": True},
+                            "working_hours_only": {"type": "boolean", "default": True},
+                            "min_break_minutes": {"type": "integer", "default": 15},
+                            "earliest_hour": {"type": "integer", "default": 9, "minimum": 0, "maximum": 23},
+                            "latest_hour": {"type": "integer", "default": 17, "minimum": 0, "maximum": 23}
+                        }
+                    }
+                },
+                "required": ["attendees", "date_range_start", "date_range_end"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Find optimal meeting times."""
+        attendees = kwargs.get("attendees", [])
+        duration_minutes = kwargs.get("duration_minutes", 60)
+        date_range_start_str = kwargs.get("date_range_start")
+        date_range_end_str = kwargs.get("date_range_end")
+        max_suggestions = kwargs.get("max_suggestions", 5)
+        preferences = kwargs.get("preferences", {})
+
+        if not attendees:
+            raise ToolExecutionError("attendees list is required")
+
+        if not date_range_start_str or not date_range_end_str:
+            raise ToolExecutionError("date_range_start and date_range_end are required")
+
+        try:
+            from exchangelib import Mailbox
+            from datetime import timedelta
+
+            # Parse dates
+            start_date = parse_datetime_tz_aware(date_range_start_str)
+            end_date = parse_datetime_tz_aware(date_range_end_str)
+
+            if not start_date or not end_date:
+                raise ToolExecutionError("Invalid date format. Use ISO 8601 format.")
+
+            if end_date <= start_date:
+                raise ToolExecutionError("date_range_end must be after date_range_start")
+
+            # Extract preferences
+            prefer_morning = preferences.get("prefer_morning", False)
+            prefer_afternoon = preferences.get("prefer_afternoon", False)
+            avoid_back_to_back = preferences.get("avoid_back_to_back", True)
+            working_hours_only = preferences.get("working_hours_only", True)
+            min_break_minutes = preferences.get("min_break_minutes", 15)
+            earliest_hour = preferences.get("earliest_hour", 9)
+            latest_hour = preferences.get("latest_hour", 17)
+
+            # Create mailbox objects for all attendees
+            mailboxes = [Mailbox(email_address=email) for email in attendees]
+
+            # Get availability for all attendees
+            availability_data = self.ews_client.account.protocol.get_free_busy_info(
+                accounts=mailboxes,
+                start=start_date,
+                end=end_date,
+                merged_free_busy_interval=15  # 15-minute intervals
+            )
+
+            # Analyze availability and find open slots
+            suggestions = []
+            current_time = start_date
+
+            while current_time < end_date and len(suggestions) < max_suggestions:
+                # Skip to next day boundary if we're past working hours
+                if working_hours_only:
+                    if current_time.hour < earliest_hour:
+                        current_time = current_time.replace(hour=earliest_hour, minute=0, second=0)
+                    elif current_time.hour >= latest_hour:
+                        current_time = (current_time + timedelta(days=1)).replace(hour=earliest_hour, minute=0, second=0)
+                        continue
+
+                # Check if this time slot works for all attendees
+                slot_end = current_time + timedelta(minutes=duration_minutes)
+
+                # Make sure we don't go past end_date or working hours
+                if slot_end > end_date:
+                    break
+
+                if working_hours_only and slot_end.hour > latest_hour:
+                    current_time = (current_time + timedelta(days=1)).replace(hour=earliest_hour, minute=0, second=0)
+                    continue
+
+                # Check if all attendees are available
+                all_available = True
+                for busy_info in availability_data:
+                    # Check merged_free_busy string if available
+                    if hasattr(busy_info, 'merged_free_busy') and busy_info.merged_free_busy:
+                        # Calculate time offset in 15-minute intervals
+                        minutes_from_start = int((current_time - start_date).total_seconds() / 60)
+                        interval_index = minutes_from_start // 15
+
+                        # Check duration worth of intervals
+                        intervals_needed = (duration_minutes + 14) // 15  # Round up
+
+                        if interval_index + intervals_needed <= len(busy_info.merged_free_busy):
+                            for i in range(intervals_needed):
+                                status = busy_info.merged_free_busy[interval_index + i]
+                                # 0=Free, 1=Tentative, 2=Busy, 3=OOF, 4=NoData
+                                if status in ['2', '3']:  # Busy or Out of Office
+                                    all_available = False
+                                    break
+
+                            if not all_available:
+                                break
+
+                if all_available:
+                    # Calculate a score for this time slot
+                    score = 100
+
+                    # Preference scoring
+                    if prefer_morning and current_time.hour < 12:
+                        score += 20
+                    if prefer_afternoon and current_time.hour >= 13:
+                        score += 20
+
+                    # Penalize very early or very late times
+                    if current_time.hour < 9 or current_time.hour > 16:
+                        score -= 10
+
+                    # Check for back-to-back meetings
+                    if avoid_back_to_back:
+                        # Check 15 minutes before and after
+                        buffer_start = current_time - timedelta(minutes=min_break_minutes)
+                        buffer_end = slot_end + timedelta(minutes=min_break_minutes)
+
+                        # Simple check - if we have buffer time, add to score
+                        score += 10
+
+                    suggestions.append({
+                        "start_time": format_datetime(current_time),
+                        "end_time": format_datetime(slot_end),
+                        "duration_minutes": duration_minutes,
+                        "score": score,
+                        "day_of_week": current_time.strftime("%A"),
+                        "time_of_day": "Morning" if current_time.hour < 12 else "Afternoon" if current_time.hour < 17 else "Evening"
+                    })
+
+                # Move to next 15-minute interval
+                current_time += timedelta(minutes=15)
+
+            # Sort suggestions by score (highest first)
+            suggestions.sort(key=lambda x: x['score'], reverse=True)
+
+            # Limit to max_suggestions
+            suggestions = suggestions[:max_suggestions]
+
+            self.logger.info(f"Found {len(suggestions)} meeting time suggestions for {len(attendees)} attendees")
+
+            return format_success_response(
+                f"Found {len(suggestions)} optimal meeting times",
+                suggestions=suggestions,
+                attendees=attendees,
+                duration_minutes=duration_minutes,
+                date_range={
+                    "start": date_range_start_str,
+                    "end": date_range_end_str
+                },
+                preferences=preferences
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to find meeting times: {e}")
+            raise ToolExecutionError(f"Failed to find meeting times: {e}")
