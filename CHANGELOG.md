@@ -5,6 +5,33 @@ All notable changes to EWS MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2025-11-07
+
+### Added - 7 New MVP Tools
+
+**Email Tools (3 new):**
+- `update_email` - Update email properties including read status, flags, categories, and importance levels
+- `list_attachments` - List all attachments for a specific email message with details (name, size, content type)
+- `download_attachment` - Download email attachments as base64 encoded strings or save directly to file
+
+**Calendar Tools (1 new):**
+- `check_availability` - Get free/busy information for one or more users in a specified time range with customizable interval granularity
+
+**Contact Tools (1 new):**
+- `resolve_names` - Resolve partial names or email addresses to full contact information from Active Directory or Contacts
+
+**Search Tools (1 new):**
+- `advanced_search` - Perform complex multi-criteria searches across multiple folders with support for keywords, date ranges, importance, categories, and more
+
+**Folder Tools (1 new):**
+- `list_folders` - Get mailbox folder hierarchy with configurable depth, item counts, and hidden folder filtering
+
+**Total Tools:** Now 28 tools (previously 21)
+
+### Changed
+- Enhanced features list in README.md to reflect all 28 tools
+- Updated tool categorization to include new Search and Folder categories
+
 ## [1.0.0] - 2025-01-04
 
 ### Added
