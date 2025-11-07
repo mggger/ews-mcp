@@ -48,6 +48,7 @@ async def test_send_email_validation_error(mock_ews_client):
 @pytest.mark.asyncio
 async def test_read_emails_tool(mock_ews_client):
     """Test reading emails."""
+    from datetime import datetime
     tool = ReadEmailsTool(mock_ews_client)
 
     # Mock inbox items
@@ -55,7 +56,7 @@ async def test_read_emails_tool(mock_ews_client):
     mock_email.id = "email-1"
     mock_email.subject = "Test Subject"
     mock_email.sender.email_address = "sender@example.com"
-    mock_email.datetime_received = "2025-01-01T10:00:00"
+    mock_email.datetime_received = datetime(2025, 1, 1, 10, 0, 0)
     mock_email.is_read = False
     mock_email.has_attachments = False
     mock_email.text_body = "Test body"
@@ -162,7 +163,7 @@ async def test_update_email_not_found(mock_ews_client):
     mock_ews_client.account.sent.get.side_effect = Exception("Not found")
     mock_ews_client.account.drafts.get.side_effect = Exception("Not found")
 
-    result = await tool.execute(message_id="nonexistent-id", is_read=True)
+    with pytest.raises(Exception) as exc_info:
+        await tool.execute(message_id="nonexistent-id", is_read=True)
 
-    assert result["success"] is False
-    assert "not found" in result["message"].lower()
+    assert "not found" in str(exc_info.value).lower()

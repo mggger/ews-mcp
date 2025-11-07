@@ -467,7 +467,7 @@ class CheckAvailabilityTool(BaseTool):
                 raise ToolExecutionError("end_time must be after start_time")
 
             # Create mailbox objects
-            from exchangelib import Mailbox, FreeBusyView
+            from exchangelib import Mailbox
             mailboxes = [Mailbox(email_address=email) for email in email_addresses]
 
             # Get free/busy information

@@ -148,13 +148,13 @@ async def test_list_folders_invalid_depth(mock_ews_client):
     """Test listing folders with invalid depth."""
     tool = ListFoldersTool(mock_ews_client)
 
-    result = await tool.execute(
-        parent_folder="inbox",
-        depth=15  # Exceeds maximum of 10
-    )
+    with pytest.raises(Exception) as exc_info:
+        await tool.execute(
+            parent_folder="inbox",
+            depth=15  # Exceeds maximum of 10
+        )
 
-    assert result["success"] is False
-    assert "depth must be between 1 and 10" in result["message"].lower()
+    assert "depth must be between 1 and 10" in str(exc_info.value).lower()
 
 
 @pytest.mark.asyncio
@@ -162,10 +162,10 @@ async def test_list_folders_unknown_parent(mock_ews_client):
     """Test listing folders with unknown parent folder."""
     tool = ListFoldersTool(mock_ews_client)
 
-    result = await tool.execute(
-        parent_folder="nonexistent_folder",
-        depth=1
-    )
+    with pytest.raises(Exception) as exc_info:
+        await tool.execute(
+            parent_folder="nonexistent_folder",
+            depth=1
+        )
 
-    assert result["success"] is False
-    assert "unknown parent folder" in result["message"].lower()
+    assert "unknown parent folder" in str(exc_info.value).lower()

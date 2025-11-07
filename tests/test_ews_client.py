@@ -50,9 +50,10 @@ def test_ews_client_connection_test(mock_settings, mock_auth_handler):
 
 def test_ews_client_connection_failure(mock_settings, mock_auth_handler):
     """Test connection failure handling."""
+    from unittest.mock import PropertyMock
     with patch.object(EWSClient, '_create_account') as mock_create:
         mock_account = MagicMock()
-        mock_account.inbox.total_count = MagicMock(side_effect=Exception("Connection failed"))
+        type(mock_account.inbox).total_count = PropertyMock(side_effect=Exception("Connection failed"))
         mock_create.return_value = mock_account
 
         client = EWSClient(mock_settings, mock_auth_handler)

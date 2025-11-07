@@ -142,13 +142,13 @@ async def test_check_availability_invalid_time_range(mock_ews_client):
     """Test checking availability with invalid time range."""
     tool = CheckAvailabilityTool(mock_ews_client)
 
-    result = await tool.execute(
-        email_addresses=["user@example.com"],
-        start_time="2025-01-15T17:00:00+00:00",
-        end_time="2025-01-15T09:00:00+00:00",  # End before start
-        interval_minutes=30
-    )
+    with pytest.raises(Exception) as exc_info:
+        await tool.execute(
+            email_addresses=["user@example.com"],
+            start_time="2025-01-15T17:00:00+00:00",
+            end_time="2025-01-15T09:00:00+00:00",  # End before start
+            interval_minutes=30
+        )
 
-    assert result["success"] is False
-    assert "after start_time" in result["message"].lower()
+    assert "after start_time" in str(exc_info.value).lower()
 
