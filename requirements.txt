@@ -21,3 +21,6 @@ python-dateutil==2.8.2
 
 # Logging and monitoring
 structlog==24.1.0
+
+# AI/ML (optional - for AI Intelligence Layer)
+httpx>=0.25.0  # For AI API requests

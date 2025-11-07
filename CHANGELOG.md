@@ -5,6 +5,78 @@ All notable changes to EWS MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-11-07
+
+### Added - Phase 3 Stage 3: AI Intelligence Layer
+
+**4 AI-Powered Tools**
+
+#### AI Intelligence Tools (4 new)
+- `semantic_search_emails` - Natural language search across emails using AI embeddings and semantic similarity
+- `classify_email` - AI-powered email classification (priority, sentiment, category, spam detection)
+- `summarize_email` - Generate concise AI summaries of email content
+- `suggest_replies` - Generate context-aware smart reply suggestions
+
+**AI Service Infrastructure:**
+- `src/ai/base.py` - Abstract base classes for AI and embedding providers
+- `src/ai/openai_provider.py` - OpenAI API integration (GPT-4, embeddings)
+- `src/ai/anthropic_provider.py` - Anthropic Claude API integration
+- `src/ai/provider_factory.py` - Factory for instantiating AI providers
+- `src/ai/embedding_service.py` - Embedding management with caching and semantic search
+- `src/ai/classification_service.py` - Email classification service with multiple AI-powered analyses
+
+**Configuration:**
+- Added 13 new AI-related configuration options to `src/config.py`
+- Support for OpenAI, Anthropic, and local models (Ollama, LM Studio)
+- Configurable AI features (semantic search, classification, summarization, smart replies)
+- `.env.ai.example` template for AI configuration
+
+**Features:**
+- **Semantic Search**: Find emails by meaning, not just keywords
+- **Email Classification**: Automatic priority, sentiment, and category detection
+- **Spam Detection**: AI-powered spam and phishing detection
+- **Email Summarization**: Generate concise summaries of long emails
+- **Smart Replies**: Context-aware reply suggestions with varying tones
+- **Embedding Cache**: Persistent caching of embeddings for performance
+- **Multi-Provider Support**: OpenAI, Anthropic Claude, or local models
+
+**Total Tools:** Up to 44 tools (40 base + 4 AI tools when enabled)
+
+### Infrastructure
+
+- Added `httpx>=0.25.0` dependency for AI API requests
+- Embedding cache stored in `data/embeddings/`
+- Conditional AI tool registration based on feature flags
+- Temperature and token limits configurable per provider
+
+### Configuration Examples
+
+**OpenAI:**
+```bash
+ENABLE_AI=true
+AI_PROVIDER=openai
+AI_API_KEY=sk-your-key
+AI_MODEL=gpt-4o-mini
+AI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+**Anthropic Claude:**
+```bash
+ENABLE_AI=true
+AI_PROVIDER=anthropic
+AI_API_KEY=sk-ant-your-key
+AI_MODEL=claude-3-5-sonnet-20241022
+```
+
+**Local Models (Ollama/LM Studio):**
+```bash
+ENABLE_AI=true
+AI_PROVIDER=local
+AI_BASE_URL=http://localhost:11434/v1
+AI_MODEL=llama3
+AI_EMBEDDING_MODEL=nomic-embed-text
+```
+
 ## [2.0.0] - 2025-11-07
 
 ### Added - Phase 3 Stage 1 & 2: 12 New Enterprise Tools
