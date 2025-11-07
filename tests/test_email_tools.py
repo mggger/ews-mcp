@@ -9,7 +9,8 @@ from src.tools.email_tools import (
     SearchEmailsTool,
     GetEmailDetailsTool,
     DeleteEmailTool,
-    MoveEmailTool
+    MoveEmailTool,
+    UpdateEmailTool
 )
 
 
@@ -124,3 +125,44 @@ async def test_move_email_tool(mock_ews_client):
 
     assert result["success"] is True
     mock_email.move.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_update_email_tool(mock_ews_client):
+    """Test updating email properties."""
+    tool = UpdateEmailTool(mock_ews_client)
+
+    # Mock email
+    mock_email = MagicMock()
+    mock_email.flag = MagicMock()
+    mock_ews_client.account.inbox.get.return_value = mock_email
+
+    result = await tool.execute(
+        message_id="test-id",
+        is_read=True,
+        categories=["Important", "Work"],
+        flag_status="Flagged",
+        importance="High"
+    )
+
+    assert result["success"] is True
+    assert "updated successfully" in result["message"].lower()
+    assert result["updates"]["is_read"] is True
+    assert result["updates"]["categories"] == ["Important", "Work"]
+    mock_email.save.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_update_email_not_found(mock_ews_client):
+    """Test updating email that doesn't exist."""
+    tool = UpdateEmailTool(mock_ews_client)
+
+    # Mock all folders to raise exception (message not found)
+    mock_ews_client.account.inbox.get.side_effect = Exception("Not found")
+    mock_ews_client.account.sent.get.side_effect = Exception("Not found")
+    mock_ews_client.account.drafts.get.side_effect = Exception("Not found")
+
+    result = await tool.execute(message_id="nonexistent-id", is_read=True)
+
+    assert result["success"] is False
+    assert "not found" in result["message"].lower()

@@ -9,7 +9,8 @@ from src.tools.calendar_tools import (
     GetCalendarTool,
     UpdateAppointmentTool,
     DeleteAppointmentTool,
-    RespondToMeetingTool
+    RespondToMeetingTool,
+    CheckAvailabilityTool
 )
 
 
@@ -106,3 +107,48 @@ async def test_respond_to_meeting_tool(mock_ews_client):
 
     assert result["success"] is True
     mock_meeting.accept.assert_called_once()
+
+
+
+@pytest.mark.asyncio
+async def test_check_availability_tool(mock_ews_client):
+    """Test checking availability for users."""
+    tool = CheckAvailabilityTool(mock_ews_client)
+
+    # Mock availability data
+    mock_availability = MagicMock()
+    mock_availability.free_busy_view_type = "Detailed"
+    mock_availability.merged_free_busy = "00002222000"
+    mock_availability.calendar_event_array = []
+
+    mock_ews_client.account.protocol.get_free_busy_info.return_value = [mock_availability]
+
+    result = await tool.execute(
+        email_addresses=["user1@example.com"],
+        start_time="2025-01-15T09:00:00+00:00",
+        end_time="2025-01-15T17:00:00+00:00",
+        interval_minutes=30
+    )
+
+    assert result["success"] is True
+    assert len(result["availability"]) == 1
+    assert result["availability"][0]["email"] == "user1@example.com"
+    assert "merged_free_busy" in result["availability"][0]
+    mock_ews_client.account.protocol.get_free_busy_info.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_check_availability_invalid_time_range(mock_ews_client):
+    """Test checking availability with invalid time range."""
+    tool = CheckAvailabilityTool(mock_ews_client)
+
+    result = await tool.execute(
+        email_addresses=["user@example.com"],
+        start_time="2025-01-15T17:00:00+00:00",
+        end_time="2025-01-15T09:00:00+00:00",  # End before start
+        interval_minutes=30
+    )
+
+    assert result["success"] is False
+    assert "after start_time" in result["message"].lower()
+
