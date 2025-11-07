@@ -5,6 +5,74 @@ All notable changes to EWS MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-11-07
+
+### Added - Phase 3 Stage 1 & 2: 12 New Enterprise Tools
+
+**Version 2.0 expands the EWS MCP Server from 28 MVP tools to 40 enterprise-grade tools.**
+
+#### Folder Management Tools (4 new)
+- `create_folder` - Create new mailbox folders with custom folder classes and parent folder selection
+- `delete_folder` - Delete folders with soft delete or permanent deletion options
+- `rename_folder` - Rename existing folders while preserving hierarchy
+- `move_folder` - Move folders to new parent locations for better organization
+
+#### Enhanced Attachment Tools (2 new)
+- `add_attachment` - Add attachments via file path or base64 content with inline attachment support and MIME type configuration
+- `delete_attachment` - Remove attachments by ID or name from email messages
+
+#### Advanced Search Tools (2 new)
+- `search_by_conversation` - Find all emails in a conversation thread by conversation ID or message ID
+- `full_text_search` - Full-text search across email content with case-sensitive matching, exact phrase search, and configurable search scope
+
+#### Out-of-Office Tools (2 new)
+- `set_oof_settings` - Configure automatic replies with Enabled/Scheduled/Disabled states, separate internal/external messages, and scheduling
+- `get_oof_settings` - Retrieve current OOF settings with active status indication
+
+#### Calendar Enhancement Tools (1 new)
+- `find_meeting_times` - AI-powered meeting time finder that analyzes attendee availability and suggests optimal meeting slots with intelligent scoring based on preferences
+
+#### Email Enhancement Tools (1 new)
+- `copy_email` - Copy emails to folders while preserving originals (vs. move which relocates)
+
+**Total Tools:** Now 40 tools (8 Email, 7 Calendar, 6 Contact, 5 Task, 4 Attachment, 5 Folder, 3 Search, 2 OOF)
+
+### Testing & Quality Assurance
+
+**Comprehensive Test Suite:**
+- `tests/test_oof_tools.py` - 10 test cases for Out-of-Office functionality
+- `tests/test_folder_management.py` - 11 test cases for folder operations
+- `tests/test_enhanced_attachments.py` - 11 test cases for attachment management
+- `tests/test_advanced_search.py` - 10 test cases for search functionality
+- `tests/test_calendar_enhancement.py` - 9 test cases for meeting time finder
+- Added 2 test cases to `tests/test_email_tools.py` for copy_email functionality
+
+**Total Test Cases:** 53 new tests covering all 12 new tools
+
+### Documentation
+
+**Updated Documentation:**
+- README.md: Added "What's New in v2.0" section with feature highlights and code examples
+- API.md: Comprehensive documentation for all 12 new tools with input schemas, response formats, and examples
+- CHANGELOG.md: Detailed Phase 3 Stage 1 & 2 implementation summary
+
+**Feature Highlight Examples:**
+- Smart meeting scheduling with availability analysis
+- Conversation threading for email management
+- Advanced folder organization workflows
+- Out-of-office automation with scheduling
+
+### Infrastructure
+
+- `scripts/run_all_tests.sh` - Automated test runner with coverage reporting and formatted output
+- Updated version to 2.0.0 in src/main.py
+- Enhanced tool registration with detailed category logging
+
+### Changed
+- Enhanced features list in README.md to reflect all 40 tools
+- Expanded API documentation with 12 new tool references
+- Updated tool categorization with OOF tools category
+
 ## [Unreleased] - 2025-11-07
 
 ### Added - 7 New MVP Tools
