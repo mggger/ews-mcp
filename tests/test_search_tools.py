@@ -9,6 +9,7 @@ from src.tools.search_tools import AdvancedSearchTool
 @pytest.mark.asyncio
 async def test_advanced_search_tool(mock_ews_client):
     """Test advanced search with multiple filters."""
+    from datetime import datetime
     tool = AdvancedSearchTool(mock_ews_client)
 
     # Mock search results
@@ -17,7 +18,7 @@ async def test_advanced_search_tool(mock_ews_client):
     mock_email.subject = "Important Meeting"
     mock_email.sender.email_address = "boss@example.com"
     mock_email.to_recipients = [MagicMock(email_address="team@example.com")]
-    mock_email.datetime_received = "2025-01-15T10:00:00"
+    mock_email.datetime_received = datetime(2025, 1, 15, 10, 0, 0)
     mock_email.is_read = False
     mock_email.has_attachments = True
     mock_email.importance = "High"
@@ -78,6 +79,7 @@ async def test_advanced_search_with_date_range(mock_ews_client):
 @pytest.mark.asyncio
 async def test_advanced_search_multiple_folders(mock_ews_client):
     """Test searching across multiple folders."""
+    from datetime import datetime
     tool = AdvancedSearchTool(mock_ews_client)
 
     # Mock results from different folders
@@ -86,7 +88,7 @@ async def test_advanced_search_multiple_folders(mock_ews_client):
     mock_inbox_email.subject = "Inbox Email"
     mock_inbox_email.sender.email_address = "sender@example.com"
     mock_inbox_email.to_recipients = []
-    mock_inbox_email.datetime_received = "2025-01-15T10:00:00"
+    mock_inbox_email.datetime_received = datetime(2025, 1, 15, 10, 0, 0)
     mock_inbox_email.is_read = False
     mock_inbox_email.has_attachments = False
     mock_inbox_email.importance = "Normal"
@@ -98,7 +100,7 @@ async def test_advanced_search_multiple_folders(mock_ews_client):
     mock_sent_email.subject = "Sent Email"
     mock_sent_email.sender.email_address = "me@example.com"
     mock_sent_email.to_recipients = []
-    mock_sent_email.datetime_received = "2025-01-15T11:00:00"
+    mock_sent_email.datetime_received = datetime(2025, 1, 15, 11, 0, 0)
     mock_sent_email.is_read = True
     mock_sent_email.has_attachments = False
     mock_sent_email.importance = "Normal"
@@ -133,13 +135,13 @@ async def test_advanced_search_empty_filter(mock_ews_client):
     """Test advanced search with empty filter."""
     tool = AdvancedSearchTool(mock_ews_client)
 
-    result = await tool.execute(
-        search_filter={},
-        search_scope=["inbox"]
-    )
+    with pytest.raises(Exception) as exc_info:
+        await tool.execute(
+            search_filter={},
+            search_scope=["inbox"]
+        )
 
-    assert result["success"] is False
-    assert "no valid search filters" in result["message"].lower()
+    assert "search_filter is required" in str(exc_info.value).lower() or "empty" in str(exc_info.value).lower()
 
 
 @pytest.mark.asyncio
@@ -147,10 +149,10 @@ async def test_advanced_search_invalid_folder(mock_ews_client):
     """Test advanced search with invalid folder."""
     tool = AdvancedSearchTool(mock_ews_client)
 
-    result = await tool.execute(
-        search_filter={"subject": "test"},
-        search_scope=["nonexistent_folder"]
-    )
+    with pytest.raises(Exception) as exc_info:
+        await tool.execute(
+            search_filter={"subject": "test"},
+            search_scope=["nonexistent_folder"]
+        )
 
-    assert result["success"] is False
-    assert "no valid folders" in result["message"].lower()
+    assert "no valid folders" in str(exc_info.value).lower()

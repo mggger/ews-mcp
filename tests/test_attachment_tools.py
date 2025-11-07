@@ -151,11 +151,11 @@ async def test_download_attachment_not_found(mock_ews_client):
     mock_message.attachments = [mock_attachment]
     mock_ews_client.account.inbox.get.return_value = mock_message
 
-    result = await tool.execute(
-        message_id="test-id",
-        attachment_id="nonexistent-id",
-        return_as="base64"
-    )
+    with pytest.raises(Exception) as exc_info:
+        await tool.execute(
+            message_id="test-id",
+            attachment_id="nonexistent-id",
+            return_as="base64"
+        )
 
-    assert result["success"] is False
-    assert "not found" in result["message"].lower()
+    assert "not found" in str(exc_info.value).lower()
