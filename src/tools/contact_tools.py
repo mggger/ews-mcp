@@ -377,3 +377,91 @@ class DeleteContactTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Failed to delete contact: {e}")
             raise ToolExecutionError(f"Failed to delete contact: {e}")
+
+
+class ResolveNamesTool(BaseTool):
+    """Tool for resolving partial names or email addresses."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "resolve_names",
+            "description": "Resolve partial names or email addresses to full contact information from Active Directory or Contacts",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name_query": {
+                        "type": "string",
+                        "description": "Partial name or email address to resolve"
+                    },
+                    "return_full_info": {
+                        "type": "boolean",
+                        "description": "Return detailed contact information",
+                        "default": False
+                    },
+                    "search_scope": {
+                        "type": "string",
+                        "enum": ["Contacts", "ActiveDirectory", "All"],
+                        "description": "Where to search for the name",
+                        "default": "All"
+                    }
+                },
+                "required": ["name_query"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Resolve names to contacts."""
+        name_query = kwargs.get("name_query")
+        return_full_info = kwargs.get("return_full_info", False)
+        search_scope = kwargs.get("search_scope", "All")
+
+        if not name_query:
+            raise ToolExecutionError("name_query is required")
+
+        try:
+            # Use exchangelib's resolve_names method
+            resolved = self.ews_client.account.protocol.resolve_names(
+                unresolved_entries=[name_query],
+                return_full_contact_data=return_full_info
+            )
+
+            # Format results
+            results = []
+            for resolution in resolved:
+                if resolution:
+                    mailbox = resolution.mailbox if hasattr(resolution, 'mailbox') else None
+
+                    if mailbox:
+                        result = {
+                            "name": safe_get(mailbox, 'name', ''),
+                            "email": safe_get(mailbox, 'email_address', ''),
+                            "routing_type": safe_get(mailbox, 'routing_type', 'SMTP'),
+                            "mailbox_type": safe_get(mailbox, 'mailbox_type', 'Mailbox')
+                        }
+
+                        # Add contact details if available and requested
+                        if return_full_info and hasattr(resolution, 'contact'):
+                            contact = resolution.contact
+                            result["contact_details"] = {
+                                "given_name": safe_get(contact, 'given_name'),
+                                "surname": safe_get(contact, 'surname'),
+                                "company": safe_get(contact, 'company_name'),
+                                "job_title": safe_get(contact, 'job_title'),
+                                "phone_numbers": safe_get(contact, 'phone_numbers', []),
+                                "department": safe_get(contact, 'department')
+                            }
+
+                        results.append(result)
+
+            self.logger.info(f"Resolved {len(results)} match(es) for '{name_query}'")
+
+            return format_success_response(
+                f"Found {len(results)} match(es) for '{name_query}'",
+                query=name_query,
+                results=results,
+                count=len(results)
+            )
+
+        except Exception as e:
+            self.logger.error(f"Failed to resolve names: {e}")
+            raise ToolExecutionError(f"Failed to resolve names: {e}")

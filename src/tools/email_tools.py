@@ -509,3 +509,109 @@ class MoveEmailTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Failed to move email: {e}")
             raise ToolExecutionError(f"Failed to move email: {e}")
+
+
+class UpdateEmailTool(BaseTool):
+    """Tool for updating email properties."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "update_email",
+            "description": "Update email properties (read status, flags, categories, importance)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "message_id": {
+                        "type": "string",
+                        "description": "Email message ID"
+                    },
+                    "is_read": {
+                        "type": "boolean",
+                        "description": "Mark as read (true) or unread (false)"
+                    },
+                    "categories": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Email categories (labels)"
+                    },
+                    "flag_status": {
+                        "type": "string",
+                        "enum": ["NotFlagged", "Flagged", "Complete"],
+                        "description": "Flag status"
+                    },
+                    "importance": {
+                        "type": "string",
+                        "enum": ["Low", "Normal", "High"],
+                        "description": "Email importance level"
+                    }
+                },
+                "required": ["message_id"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Update email properties."""
+        message_id = kwargs.get("message_id")
+
+        if not message_id:
+            raise ToolExecutionError("message_id is required")
+
+        try:
+            # Find the message across common folders
+            message = None
+            folders_to_search = [
+                self.ews_client.account.inbox,
+                self.ews_client.account.sent,
+                self.ews_client.account.drafts
+            ]
+
+            for folder in folders_to_search:
+                try:
+                    message = folder.get(id=message_id)
+                    if message:
+                        break
+                except Exception:
+                    continue
+
+            if not message:
+                raise ToolExecutionError(f"Message not found: {message_id}")
+
+            # Track what was updated
+            updates = {}
+
+            # Update read status
+            if "is_read" in kwargs:
+                message.is_read = kwargs["is_read"]
+                updates["is_read"] = kwargs["is_read"]
+
+            # Update categories
+            if "categories" in kwargs:
+                message.categories = kwargs["categories"]
+                updates["categories"] = kwargs["categories"]
+
+            # Update flag status
+            if "flag_status" in kwargs:
+                message.flag.flag_status = kwargs["flag_status"]
+                updates["flag_status"] = kwargs["flag_status"]
+
+            # Update importance
+            if "importance" in kwargs:
+                message.importance = kwargs["importance"]
+                updates["importance"] = kwargs["importance"]
+
+            # Save changes
+            message.save()
+
+            self.logger.info(f"Email {message_id} updated: {updates}")
+
+            return format_success_response(
+                "Email updated successfully",
+                message_id=message_id,
+                updates=updates
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to update email: {e}")
+            raise ToolExecutionError(f"Failed to update email: {e}")

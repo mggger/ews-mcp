@@ -7,7 +7,7 @@ from exchangelib import CalendarItem, Mailbox, Attendee
 from .base import BaseTool
 from ..models import CreateAppointmentRequest, MeetingResponse
 from ..exceptions import ToolExecutionError
-from ..utils import format_success_response, safe_get, parse_datetime_tz_aware, make_tz_aware
+from ..utils import format_success_response, safe_get, parse_datetime_tz_aware, make_tz_aware, format_datetime
 
 
 class CreateAppointmentTool(BaseTool):
@@ -405,3 +405,129 @@ class RespondToMeetingTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Failed to respond to meeting: {e}")
             raise ToolExecutionError(f"Failed to respond to meeting: {e}")
+
+
+class CheckAvailabilityTool(BaseTool):
+    """Tool for checking free/busy availability."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "check_availability",
+            "description": "Get free/busy information for email addresses in a time range",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "email_addresses": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of email addresses to check"
+                    },
+                    "start_time": {
+                        "type": "string",
+                        "description": "Start time (ISO 8601 format)"
+                    },
+                    "end_time": {
+                        "type": "string",
+                        "description": "End time (ISO 8601 format)"
+                    },
+                    "interval_minutes": {
+                        "type": "integer",
+                        "description": "Time slot granularity in minutes",
+                        "default": 30,
+                        "minimum": 15,
+                        "maximum": 1440
+                    }
+                },
+                "required": ["email_addresses", "start_time", "end_time"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Check availability for users."""
+        email_addresses = kwargs.get("email_addresses", [])
+        start_time_str = kwargs.get("start_time")
+        end_time_str = kwargs.get("end_time")
+        interval_minutes = kwargs.get("interval_minutes", 30)
+
+        if not email_addresses:
+            raise ToolExecutionError("email_addresses is required and cannot be empty")
+
+        if not start_time_str or not end_time_str:
+            raise ToolExecutionError("start_time and end_time are required")
+
+        try:
+            # Parse datetimes
+            start_time = parse_datetime_tz_aware(start_time_str)
+            end_time = parse_datetime_tz_aware(end_time_str)
+
+            if not start_time or not end_time:
+                raise ToolExecutionError("Invalid datetime format. Use ISO 8601 format.")
+
+            if end_time <= start_time:
+                raise ToolExecutionError("end_time must be after start_time")
+
+            # Create mailbox objects
+            from exchangelib import Mailbox, FreeBusyView
+            mailboxes = [Mailbox(email_address=email) for email in email_addresses]
+
+            # Get free/busy information
+            availability_data = self.ews_client.account.protocol.get_free_busy_info(
+                accounts=mailboxes,
+                start=start_time,
+                end=end_time,
+                merged_free_busy_interval=interval_minutes
+            )
+
+            # Format response
+            availability_results = []
+            for i, (mailbox, busy_info) in enumerate(zip(mailboxes, availability_data)):
+                # Parse the free/busy time slots
+                # exchangelib returns FreeBusyView with working_hours_timezone, free_busy_view_type, etc.
+                result = {
+                    "email": email_addresses[i],
+                    "view_type": str(busy_info.free_busy_view_type) if hasattr(busy_info, 'free_busy_view_type') else "Detailed",
+                    "calendar_events": []
+                }
+
+                # Add calendar event information if available
+                if hasattr(busy_info, 'calendar_event_array') and busy_info.calendar_event_array:
+                    for event in busy_info.calendar_event_array:
+                        result["calendar_events"].append({
+                            "start": format_datetime(event.start) if hasattr(event, 'start') else None,
+                            "end": format_datetime(event.end) if hasattr(event, 'end') else None,
+                            "busy_type": str(event.busy_type) if hasattr(event, 'busy_type') else "Busy",
+                            "details": safe_get(event, 'details')
+                        })
+
+                # Add merged free/busy string if available
+                if hasattr(busy_info, 'merged_free_busy'):
+                    # The merged_free_busy is a string like "00002222000..." where:
+                    # 0=Free, 1=Tentative, 2=Busy, 3=OOF (Out of Office), 4=NoData
+                    result["merged_free_busy"] = busy_info.merged_free_busy
+                    result["free_busy_legend"] = {
+                        "0": "Free",
+                        "1": "Tentative",
+                        "2": "Busy",
+                        "3": "OutOfOffice",
+                        "4": "NoData"
+                    }
+
+                availability_results.append(result)
+
+            self.logger.info(f"Retrieved availability for {len(email_addresses)} users")
+
+            return format_success_response(
+                f"Availability retrieved for {len(email_addresses)} user(s)",
+                availability=availability_results,
+                time_range={
+                    "start": start_time_str,
+                    "end": end_time_str,
+                    "interval_minutes": interval_minutes
+                }
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to check availability: {e}")
+            raise ToolExecutionError(f"Failed to check availability: {e}")
