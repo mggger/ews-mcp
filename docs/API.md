@@ -142,6 +142,118 @@ Move an email to a different folder.
 }
 ```
 
+### update_email
+
+Update email properties such as read status, flags, categories, and importance.
+
+**Input Schema:**
+```json
+{
+  "message_id": "AAMkAGI...",
+  "is_read": true,                         // Optional: mark as read/unread
+  "categories": ["Important", "Work"],     // Optional: email categories/labels
+  "flag_status": "Flagged",                // Optional: NotFlagged, Flagged, Complete
+  "importance": "High"                     // Optional: Low, Normal, High
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Email updated successfully",
+  "message_id": "AAMkAGI...",
+  "updates": {
+    "is_read": true,
+    "categories": ["Important", "Work"],
+    "flag_status": "Flagged",
+    "importance": "High"
+  }
+}
+```
+
+### list_attachments
+
+List all attachments for a specific email message.
+
+**Input Schema:**
+```json
+{
+  "message_id": "AAMkAGI...",
+  "include_inline": true        // Optional: include inline images
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Found 2 attachment(s)",
+  "message_id": "AAMkAGI...",
+  "count": 2,
+  "attachments": [
+    {
+      "id": "AAMkAGI1AAAA=",
+      "name": "report.pdf",
+      "size": 245760,
+      "content_type": "application/pdf",
+      "is_inline": false,
+      "content_id": null
+    },
+    {
+      "id": "AAMkAGI2AAAA=",
+      "name": "logo.png",
+      "size": 8192,
+      "content_type": "image/png",
+      "is_inline": true,
+      "content_id": "image001"
+    }
+  ]
+}
+```
+
+### download_attachment
+
+Download an email attachment as base64 or save to file.
+
+**Input Schema:**
+```json
+{
+  "message_id": "AAMkAGI...",
+  "attachment_id": "AAMkAGI1AAAA=",
+  "return_as": "base64",           // base64 or file_path
+  "save_path": "/path/to/file"     // Required if return_as is file_path
+}
+```
+
+**Response (base64):**
+```json
+{
+  "success": true,
+  "message": "Attachment downloaded successfully",
+  "message_id": "AAMkAGI...",
+  "attachment_id": "AAMkAGI1AAAA=",
+  "name": "report.pdf",
+  "size": 245760,
+  "content_type": "application/pdf",
+  "content_base64": "JVBERi0xLjQKJeLjz9MKMy..."
+}
+```
+
+**Response (file_path):**
+```json
+{
+  "success": true,
+  "message": "Attachment saved successfully",
+  "message_id": "AAMkAGI...",
+  "attachment_id": "AAMkAGI1AAAA=",
+  "name": "report.pdf",
+  "size": 245760,
+  "content_type": "application/pdf",
+  "file_path": "/downloads/report.pdf"
+}
+```
+
 ## Calendar Tools
 
 ### create_appointment
@@ -250,6 +362,55 @@ Respond to a meeting invitation.
 }
 ```
 
+### check_availability
+
+Get free/busy information for one or more users in a specified time range.
+
+**Input Schema:**
+```json
+{
+  "email_addresses": ["user1@example.com", "user2@example.com"],
+  "start_time": "2025-01-15T09:00:00+00:00",
+  "end_time": "2025-01-15T17:00:00+00:00",
+  "interval_minutes": 30        // Optional: time slot granularity (15-1440)
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Availability retrieved for 2 user(s)",
+  "availability": [
+    {
+      "email": "user1@example.com",
+      "view_type": "Detailed",
+      "merged_free_busy": "00002222000011110000",
+      "free_busy_legend": {
+        "0": "Free",
+        "1": "Tentative",
+        "2": "Busy",
+        "3": "OutOfOffice",
+        "4": "NoData"
+      },
+      "calendar_events": [
+        {
+          "start": "2025-01-15T10:00:00+00:00",
+          "end": "2025-01-15T11:00:00+00:00",
+          "busy_type": "Busy",
+          "details": null
+        }
+      ]
+    }
+  ],
+  "time_range": {
+    "start": "2025-01-15T09:00:00+00:00",
+    "end": "2025-01-15T17:00:00+00:00",
+    "interval_minutes": 30
+  }
+}
+```
+
 ## Contact Tools
 
 ### create_contact
@@ -314,6 +475,51 @@ Delete a contact.
 ```json
 {
   "item_id": "AAMkAGU..."
+}
+```
+
+### resolve_names
+
+Resolve partial names or email addresses to full contact information from Active Directory or Contacts.
+
+**Input Schema:**
+```json
+{
+  "name_query": "john",                  // Partial name or email to resolve
+  "return_full_info": false,             // Optional: return detailed contact info
+  "search_scope": "All"                  // Optional: Contacts, ActiveDirectory, All
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Found 2 match(es) for 'john'",
+  "query": "john",
+  "count": 2,
+  "results": [
+    {
+      "name": "John Doe",
+      "email": "john.doe@example.com",
+      "routing_type": "SMTP",
+      "mailbox_type": "Mailbox"
+    },
+    {
+      "name": "Johnny Smith",
+      "email": "johnny.smith@example.com",
+      "routing_type": "SMTP",
+      "mailbox_type": "Mailbox",
+      "contact_details": {          // Only if return_full_info is true
+        "given_name": "Johnny",
+        "surname": "Smith",
+        "company": "Acme Corp",
+        "job_title": "Manager",
+        "phone_numbers": ["+1-555-0200"],
+        "department": "Sales"
+      }
+    }
+  ]
 }
 ```
 
@@ -399,6 +605,128 @@ Delete a task.
 ```json
 {
   "item_id": "AAMkAGT..."
+}
+```
+
+## Search Tools
+
+### advanced_search
+
+Perform complex multi-criteria searches across multiple mailbox folders with extensive filtering options.
+
+**Input Schema:**
+```json
+{
+  "search_filter": {
+    "keywords": "quarterly report",        // Search in subject and body
+    "from_address": "boss@example.com",
+    "to_address": "team@example.com",
+    "subject": "Q4",
+    "body": "financial",
+    "has_attachments": true,
+    "importance": "High",
+    "categories": ["Work", "Important"],
+    "is_read": false,
+    "start_date": "2025-01-01T00:00:00+00:00",
+    "end_date": "2025-01-31T23:59:59+00:00"
+  },
+  "search_scope": ["inbox", "sent"],      // Folders to search
+  "max_results": 100,                      // Max: 1000
+  "sort_by": "datetime_received",          // datetime_received, datetime_sent, from, subject, importance
+  "sort_order": "descending"               // ascending or descending
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Found 15 result(s)",
+  "count": 15,
+  "results": [
+    {
+      "message_id": "AAMkAGI...",
+      "subject": "Q4 Quarterly Report - Financial Results",
+      "from": "boss@example.com",
+      "to": ["team@example.com"],
+      "received_time": "2025-01-15T14:30:00+00:00",
+      "is_read": false,
+      "has_attachments": true,
+      "importance": "High",
+      "categories": ["Work", "Important"],
+      "body_preview": "Please review the attached quarterly financial report...",
+      "folder": "inbox"
+    }
+  ],
+  "search_filter": { /* original search criteria */ },
+  "folders_searched": ["inbox", "sent"]
+}
+```
+
+## Folder Tools
+
+### list_folders
+
+Get mailbox folder hierarchy with configurable depth and details.
+
+**Input Schema:**
+```json
+{
+  "parent_folder": "root",         // root, inbox, sent, drafts, deleted, junk, calendar, contacts, tasks
+  "depth": 2,                      // 1-10: folder tree traversal depth
+  "include_hidden": false,         // Include system/hidden folders
+  "include_counts": true           // Include item and unread counts
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Listed 12 folder(s)",
+  "total_folders": 12,
+  "parent_folder": "root",
+  "depth": 2,
+  "folder_tree": {
+    "id": "AAMkAGF...",
+    "name": "Root",
+    "parent_folder_id": "",
+    "folder_class": "IPF",
+    "child_folder_count": 4,
+    "total_count": 0,
+    "unread_count": 0,
+    "children": [
+      {
+        "id": "AAMkAGI...",
+        "name": "Inbox",
+        "parent_folder_id": "AAMkAGF...",
+        "folder_class": "IPF.Note",
+        "child_folder_count": 3,
+        "total_count": 245,
+        "unread_count": 12,
+        "children": [
+          {
+            "id": "AAMkAGJ...",
+            "name": "Projects",
+            "parent_folder_id": "AAMkAGI...",
+            "folder_class": "IPF.Note",
+            "child_folder_count": 0,
+            "total_count": 48,
+            "unread_count": 5
+          }
+        ]
+      },
+      {
+        "id": "AAMkAGK...",
+        "name": "Sent Items",
+        "parent_folder_id": "AAMkAGF...",
+        "folder_class": "IPF.Note",
+        "child_folder_count": 0,
+        "total_count": 532,
+        "unread_count": 0
+      }
+    ]
+  }
 }
 ```
 
