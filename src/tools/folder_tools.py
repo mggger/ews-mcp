@@ -1,6 +1,7 @@
 """Folder management tools for EWS MCP Server."""
 
 from typing import Any, Dict, List
+from exchangelib import Folder
 
 from .base import BaseTool
 from ..exceptions import ToolExecutionError
@@ -149,3 +150,339 @@ class ListFoldersTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Failed to list folders: {e}")
             raise ToolExecutionError(f"Failed to list folders: {e}")
+
+
+class CreateFolderTool(BaseTool):
+    """Tool for creating new mailbox folders."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "create_folder",
+            "description": "Create a new folder in the mailbox",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "folder_name": {
+                        "type": "string",
+                        "description": "Name of the new folder"
+                    },
+                    "parent_folder": {
+                        "type": "string",
+                        "description": "Parent folder location",
+                        "default": "inbox",
+                        "enum": ["root", "inbox", "sent", "drafts", "deleted", "junk", "calendar", "contacts", "tasks"]
+                    },
+                    "folder_class": {
+                        "type": "string",
+                        "description": "Folder class (type of items it will contain)",
+                        "default": "IPF.Note",
+                        "enum": ["IPF.Note", "IPF.Appointment", "IPF.Contact", "IPF.Task"]
+                    }
+                },
+                "required": ["folder_name"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Create a new folder."""
+        folder_name = kwargs.get("folder_name")
+        parent_folder_name = kwargs.get("parent_folder", "inbox").lower()
+        folder_class = kwargs.get("folder_class", "IPF.Note")
+
+        if not folder_name:
+            raise ToolExecutionError("folder_name is required")
+
+        try:
+            # Get the parent folder
+            folder_map = {
+                "root": self.ews_client.account.root,
+                "inbox": self.ews_client.account.inbox,
+                "sent": self.ews_client.account.sent,
+                "drafts": self.ews_client.account.drafts,
+                "deleted": self.ews_client.account.trash,
+                "junk": self.ews_client.account.junk,
+                "calendar": self.ews_client.account.calendar,
+                "contacts": self.ews_client.account.contacts,
+                "tasks": self.ews_client.account.tasks
+            }
+
+            parent_folder = folder_map.get(parent_folder_name)
+            if not parent_folder:
+                raise ToolExecutionError(f"Unknown parent folder: {parent_folder_name}")
+
+            # Create the new folder
+            new_folder = Folder(parent=parent_folder, name=folder_name, folder_class=folder_class)
+            new_folder.save()
+
+            self.logger.info(f"Created folder '{folder_name}' in '{parent_folder_name}'")
+
+            return format_success_response(
+                f"Folder '{folder_name}' created successfully",
+                folder_id=new_folder.id,
+                folder_name=folder_name,
+                parent_folder=parent_folder_name,
+                folder_class=folder_class
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to create folder: {e}")
+            raise ToolExecutionError(f"Failed to create folder: {e}")
+
+
+class DeleteFolderTool(BaseTool):
+    """Tool for deleting mailbox folders."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "delete_folder",
+            "description": "Delete a mailbox folder (moves to Deleted Items or permanently deletes)",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "folder_id": {
+                        "type": "string",
+                        "description": "Folder ID to delete"
+                    },
+                    "permanent": {
+                        "type": "boolean",
+                        "description": "Permanently delete (true) or move to Deleted Items (false)",
+                        "default": False
+                    }
+                },
+                "required": ["folder_id"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Delete a folder."""
+        folder_id = kwargs.get("folder_id")
+        permanent = kwargs.get("permanent", False)
+
+        if not folder_id:
+            raise ToolExecutionError("folder_id is required")
+
+        try:
+            # Find the folder by ID
+            # We need to search through the folder tree
+            folder = None
+
+            def find_folder_by_id(parent, target_id):
+                """Recursively search for folder by ID."""
+                if safe_get(parent, 'id', '') == target_id:
+                    return parent
+
+                if hasattr(parent, 'children') and parent.children:
+                    for child in parent.children:
+                        result = find_folder_by_id(child, target_id)
+                        if result:
+                            return result
+                return None
+
+            # Search starting from root
+            folder = find_folder_by_id(self.ews_client.account.root, folder_id)
+
+            if not folder:
+                raise ToolExecutionError(f"Folder not found: {folder_id}")
+
+            folder_name = safe_get(folder, 'name', 'Unknown')
+
+            # Delete the folder
+            if permanent:
+                folder.delete()
+                action = "permanently deleted"
+            else:
+                folder.soft_delete()
+                action = "moved to Deleted Items"
+
+            self.logger.info(f"Deleted folder '{folder_name}' (ID: {folder_id})")
+
+            return format_success_response(
+                f"Folder '{folder_name}' {action}",
+                folder_id=folder_id,
+                folder_name=folder_name,
+                permanent=permanent
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to delete folder: {e}")
+            raise ToolExecutionError(f"Failed to delete folder: {e}")
+
+
+class RenameFolderTool(BaseTool):
+    """Tool for renaming mailbox folders."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "rename_folder",
+            "description": "Rename an existing mailbox folder",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "folder_id": {
+                        "type": "string",
+                        "description": "Folder ID to rename"
+                    },
+                    "new_name": {
+                        "type": "string",
+                        "description": "New name for the folder"
+                    }
+                },
+                "required": ["folder_id", "new_name"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Rename a folder."""
+        folder_id = kwargs.get("folder_id")
+        new_name = kwargs.get("new_name")
+
+        if not folder_id or not new_name:
+            raise ToolExecutionError("folder_id and new_name are required")
+
+        try:
+            # Find the folder by ID
+            def find_folder_by_id(parent, target_id):
+                """Recursively search for folder by ID."""
+                if safe_get(parent, 'id', '') == target_id:
+                    return parent
+
+                if hasattr(parent, 'children') and parent.children:
+                    for child in parent.children:
+                        result = find_folder_by_id(child, target_id)
+                        if result:
+                            return result
+                return None
+
+            folder = find_folder_by_id(self.ews_client.account.root, folder_id)
+
+            if not folder:
+                raise ToolExecutionError(f"Folder not found: {folder_id}")
+
+            old_name = safe_get(folder, 'name', 'Unknown')
+
+            # Rename the folder
+            folder.name = new_name
+            folder.save()
+
+            self.logger.info(f"Renamed folder from '{old_name}' to '{new_name}'")
+
+            return format_success_response(
+                f"Folder renamed from '{old_name}' to '{new_name}'",
+                folder_id=folder_id,
+                old_name=old_name,
+                new_name=new_name
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to rename folder: {e}")
+            raise ToolExecutionError(f"Failed to rename folder: {e}")
+
+
+class MoveFolderTool(BaseTool):
+    """Tool for moving folders to a new parent folder."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "move_folder",
+            "description": "Move a folder to a new parent folder",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "folder_id": {
+                        "type": "string",
+                        "description": "Folder ID to move"
+                    },
+                    "target_parent_folder": {
+                        "type": "string",
+                        "description": "Target parent folder location",
+                        "enum": ["root", "inbox", "sent", "drafts", "deleted", "junk", "calendar", "contacts", "tasks"]
+                    },
+                    "target_parent_folder_id": {
+                        "type": "string",
+                        "description": "Target parent folder ID (alternative to target_parent_folder)"
+                    }
+                },
+                "required": ["folder_id"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Move a folder to a new parent."""
+        folder_id = kwargs.get("folder_id")
+        target_parent_name = kwargs.get("target_parent_folder")
+        target_parent_id = kwargs.get("target_parent_folder_id")
+
+        if not folder_id:
+            raise ToolExecutionError("folder_id is required")
+
+        if not target_parent_name and not target_parent_id:
+            raise ToolExecutionError("Either target_parent_folder or target_parent_folder_id is required")
+
+        try:
+            # Find the folder to move
+            def find_folder_by_id(parent, target_id):
+                """Recursively search for folder by ID."""
+                if safe_get(parent, 'id', '') == target_id:
+                    return parent
+
+                if hasattr(parent, 'children') and parent.children:
+                    for child in parent.children:
+                        result = find_folder_by_id(child, target_id)
+                        if result:
+                            return result
+                return None
+
+            folder = find_folder_by_id(self.ews_client.account.root, folder_id)
+
+            if not folder:
+                raise ToolExecutionError(f"Folder not found: {folder_id}")
+
+            folder_name = safe_get(folder, 'name', 'Unknown')
+
+            # Get target parent folder
+            if target_parent_name:
+                folder_map = {
+                    "root": self.ews_client.account.root,
+                    "inbox": self.ews_client.account.inbox,
+                    "sent": self.ews_client.account.sent,
+                    "drafts": self.ews_client.account.drafts,
+                    "deleted": self.ews_client.account.trash,
+                    "junk": self.ews_client.account.junk,
+                    "calendar": self.ews_client.account.calendar,
+                    "contacts": self.ews_client.account.contacts,
+                    "tasks": self.ews_client.account.tasks
+                }
+                target_parent = folder_map.get(target_parent_name.lower())
+                if not target_parent:
+                    raise ToolExecutionError(f"Unknown target parent folder: {target_parent_name}")
+                target_name = target_parent_name
+            else:
+                target_parent = find_folder_by_id(self.ews_client.account.root, target_parent_id)
+                if not target_parent:
+                    raise ToolExecutionError(f"Target parent folder not found: {target_parent_id}")
+                target_name = safe_get(target_parent, 'name', 'Unknown')
+
+            # Move the folder
+            folder.parent = target_parent
+            folder.save()
+
+            self.logger.info(f"Moved folder '{folder_name}' to '{target_name}'")
+
+            return format_success_response(
+                f"Folder '{folder_name}' moved to '{target_name}'",
+                folder_id=folder_id,
+                folder_name=folder_name,
+                target_parent=target_name
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to move folder: {e}")
+            raise ToolExecutionError(f"Failed to move folder: {e}")

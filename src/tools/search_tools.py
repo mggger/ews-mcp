@@ -259,3 +259,329 @@ class AdvancedSearchTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Failed to perform advanced search: {e}")
             raise ToolExecutionError(f"Failed to perform advanced search: {e}")
+
+
+class SearchByConversationTool(BaseTool):
+    """Tool for finding all emails in a conversation thread."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "search_by_conversation",
+            "description": "Find all emails in a conversation thread using conversation ID or initial message",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "conversation_id": {
+                        "type": "string",
+                        "description": "Conversation ID to search for"
+                    },
+                    "message_id": {
+                        "type": "string",
+                        "description": "Message ID to find conversation from (alternative to conversation_id)"
+                    },
+                    "search_scope": {
+                        "type": "array",
+                        "description": "Folders to search",
+                        "items": {"type": "string"},
+                        "default": ["inbox", "sent"]
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "default": 100,
+                        "minimum": 1,
+                        "maximum": 500
+                    },
+                    "include_deleted": {
+                        "type": "boolean",
+                        "description": "Include deleted items folder",
+                        "default": False
+                    }
+                },
+                "required": []
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Search for emails by conversation."""
+        conversation_id = kwargs.get("conversation_id")
+        message_id = kwargs.get("message_id")
+        search_scope = kwargs.get("search_scope", ["inbox", "sent"])
+        max_results = kwargs.get("max_results", 100)
+        include_deleted = kwargs.get("include_deleted", False)
+
+        if not conversation_id and not message_id:
+            raise ToolExecutionError("Either conversation_id or message_id is required")
+
+        try:
+            from exchangelib import Q
+
+            # If message_id provided, get conversation_id from it
+            if message_id and not conversation_id:
+                message = None
+                for folder_name in ["inbox", "sent", "drafts"]:
+                    folder_map = {
+                        "inbox": self.ews_client.account.inbox,
+                        "sent": self.ews_client.account.sent,
+                        "drafts": self.ews_client.account.drafts
+                    }
+                    folder = folder_map.get(folder_name)
+                    try:
+                        message = folder.get(id=message_id)
+                        if message:
+                            conversation_id = safe_get(message, 'conversation_id', None)
+                            if conversation_id:
+                                break
+                    except Exception:
+                        continue
+
+                if not conversation_id:
+                    raise ToolExecutionError(f"Could not find conversation_id for message: {message_id}")
+
+            # Map folder names to folder objects
+            folder_map = {
+                "inbox": self.ews_client.account.inbox,
+                "sent": self.ews_client.account.sent,
+                "drafts": self.ews_client.account.drafts,
+                "deleted": self.ews_client.account.trash,
+                "junk": self.ews_client.account.junk
+            }
+
+            # Build list of folders to search
+            folders_to_search = []
+            for folder_name in search_scope:
+                folder = folder_map.get(folder_name.lower())
+                if folder:
+                    folders_to_search.append(folder)
+
+            if include_deleted and "deleted" not in [s.lower() for s in search_scope]:
+                folders_to_search.append(self.ews_client.account.trash)
+
+            if not folders_to_search:
+                raise ToolExecutionError("No valid folders to search")
+
+            # Search for emails with this conversation ID
+            all_results = []
+            for folder in folders_to_search:
+                try:
+                    # Filter by conversation ID
+                    items = folder.filter(conversation_id=conversation_id).order_by('-datetime_received')[:max_results]
+
+                    for item in items:
+                        result = {
+                            "id": safe_get(item, 'id', ''),
+                            "subject": safe_get(item, 'subject', ''),
+                            "from": safe_get(safe_get(item, 'sender', {}), 'email_address', ''),
+                            "to": [r.email_address for r in safe_get(item, 'to_recipients', []) if hasattr(r, 'email_address')],
+                            "received": format_datetime(safe_get(item, 'datetime_received', datetime.now())),
+                            "conversation_id": safe_get(item, 'conversation_id', ''),
+                            "is_read": safe_get(item, 'is_read', False),
+                            "importance": safe_get(item, 'importance', 'Normal'),
+                            "folder": safe_get(folder, 'name', 'Unknown')
+                        }
+                        all_results.append(result)
+
+                except Exception as e:
+                    self.logger.warning(f"Error searching folder {safe_get(folder, 'name', 'Unknown')}: {e}")
+                    continue
+
+            # Sort by received date
+            all_results.sort(key=lambda x: x['received'], reverse=True)
+
+            # Limit total results
+            all_results = all_results[:max_results]
+
+            self.logger.info(f"Found {len(all_results)} emails in conversation {conversation_id}")
+
+            return format_success_response(
+                f"Found {len(all_results)} emails in conversation",
+                results=all_results,
+                conversation_id=conversation_id,
+                total_results=len(all_results),
+                searched_folders=search_scope
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to search by conversation: {e}")
+            raise ToolExecutionError(f"Failed to search by conversation: {e}")
+
+
+class FullTextSearchTool(BaseTool):
+    """Tool for full-text search across email content."""
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": "full_text_search",
+            "description": "Perform full-text search across subject, body, and attachment names",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query text"
+                    },
+                    "search_scope": {
+                        "type": "array",
+                        "description": "Folders to search",
+                        "items": {"type": "string"},
+                        "default": ["inbox", "sent"]
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "default": 50,
+                        "minimum": 1,
+                        "maximum": 500
+                    },
+                    "search_in": {
+                        "type": "array",
+                        "description": "Where to search (subject, body, attachments)",
+                        "items": {
+                            "type": "string",
+                            "enum": ["subject", "body", "attachments"]
+                        },
+                        "default": ["subject", "body"]
+                    },
+                    "case_sensitive": {
+                        "type": "boolean",
+                        "description": "Case-sensitive search",
+                        "default": False
+                    },
+                    "exact_phrase": {
+                        "type": "boolean",
+                        "description": "Search for exact phrase",
+                        "default": False
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Perform full-text search."""
+        query = kwargs.get("query")
+        search_scope = kwargs.get("search_scope", ["inbox", "sent"])
+        max_results = kwargs.get("max_results", 50)
+        search_in = kwargs.get("search_in", ["subject", "body"])
+        case_sensitive = kwargs.get("case_sensitive", False)
+        exact_phrase = kwargs.get("exact_phrase", False)
+
+        if not query:
+            raise ToolExecutionError("query is required")
+
+        try:
+            from exchangelib import Q
+
+            # Normalize query for case-insensitive search
+            search_query = query if case_sensitive else query.lower()
+
+            # Map folder names to folder objects
+            folder_map = {
+                "inbox": self.ews_client.account.inbox,
+                "sent": self.ews_client.account.sent,
+                "drafts": self.ews_client.account.drafts,
+                "deleted": self.ews_client.account.trash,
+                "junk": self.ews_client.account.junk
+            }
+
+            # Build list of folders to search
+            folders_to_search = []
+            for folder_name in search_scope:
+                folder = folder_map.get(folder_name.lower())
+                if folder:
+                    folders_to_search.append(folder)
+
+            if not folders_to_search:
+                raise ToolExecutionError("No valid folders to search")
+
+            # Build search filter based on search_in
+            all_results = []
+
+            for folder in folders_to_search:
+                try:
+                    # Build Q filter
+                    q_filters = []
+
+                    if "subject" in search_in:
+                        q_filters.append(Q(subject__contains=query))
+
+                    if "body" in search_in:
+                        q_filters.append(Q(body__contains=query))
+
+                    # Combine with OR
+                    if q_filters:
+                        combined_filter = q_filters[0]
+                        for f in q_filters[1:]:
+                            combined_filter |= f
+
+                        items = folder.filter(combined_filter).order_by('-datetime_received')[:max_results]
+
+                        for item in items:
+                            # Additional filtering for attachments and exact phrase
+                            item_text = ""
+                            if "subject" in search_in:
+                                item_text += safe_get(item, 'subject', '').lower() + " "
+                            if "body" in search_in:
+                                item_text += safe_get(item, 'text_body', '').lower() + " "
+
+                            # Check attachments if requested
+                            attachment_match = False
+                            if "attachments" in search_in and hasattr(item, 'attachments') and item.attachments:
+                                for att in item.attachments:
+                                    att_name = safe_get(att, 'name', '')
+                                    if not case_sensitive:
+                                        att_name = att_name.lower()
+                                    if search_query in att_name:
+                                        attachment_match = True
+                                        break
+
+                            # For exact phrase matching
+                            if exact_phrase and search_query not in item_text and not attachment_match:
+                                continue
+
+                            result = {
+                                "id": safe_get(item, 'id', ''),
+                                "subject": safe_get(item, 'subject', ''),
+                                "from": safe_get(safe_get(item, 'sender', {}), 'email_address', ''),
+                                "to": [r.email_address for r in safe_get(item, 'to_recipients', []) if hasattr(r, 'email_address')],
+                                "received": format_datetime(safe_get(item, 'datetime_received', datetime.now())),
+                                "is_read": safe_get(item, 'is_read', False),
+                                "has_attachments": safe_get(item, 'has_attachments', False),
+                                "importance": safe_get(item, 'importance', 'Normal'),
+                                "folder": safe_get(folder, 'name', 'Unknown'),
+                                "preview": safe_get(item, 'text_body', '')[:200] if "body" in search_in else ""
+                            }
+                            all_results.append(result)
+
+                except Exception as e:
+                    self.logger.warning(f"Error searching folder {safe_get(folder, 'name', 'Unknown')}: {e}")
+                    continue
+
+            # Sort by received date
+            all_results.sort(key=lambda x: x['received'], reverse=True)
+
+            # Limit total results
+            all_results = all_results[:max_results]
+
+            self.logger.info(f"Full-text search for '{query}' found {len(all_results)} results")
+
+            return format_success_response(
+                f"Found {len(all_results)} emails matching '{query}'",
+                results=all_results,
+                query=query,
+                total_results=len(all_results),
+                searched_folders=search_scope,
+                search_options={
+                    "case_sensitive": case_sensitive,
+                    "exact_phrase": exact_phrase,
+                    "search_in": search_in
+                }
+            )
+
+        except ToolExecutionError:
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to perform full-text search: {e}")
+            raise ToolExecutionError(f"Failed to perform full-text search: {e}")
