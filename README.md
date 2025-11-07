@@ -6,10 +6,13 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 
 ## Features
 
-- ✅ **Email Operations**: Send, read, search, delete, move emails with attachment support
-- ✅ **Calendar Management**: Create, update, delete appointments, respond to meetings
+- ✅ **Email Operations**: Send, read, search, delete, move, **copy** emails with enhanced attachment support
+- ✅ **Calendar Management**: Create, update, delete appointments, respond to meetings, **AI-powered meeting time finder**
 - ✅ **Contact Management**: Full CRUD operations for Exchange contacts
 - ✅ **Task Management**: Create and manage Exchange tasks
+- ✅ **Folder Management**: Create, delete, rename, move mailbox folders
+- ✅ **Advanced Search**: Conversation threading, full-text search across email content
+- ✅ **Out-of-Office**: Configure automatic replies with scheduling
 - ✅ **Multi-Authentication**: Support for OAuth2, Basic Auth, and NTLM
 - ✅ **Timezone Support**: Proper handling of timezones (tested with Asia/Riyadh, UTC, etc.)
 - ✅ **HTTP/SSE Transport**: Support for both stdio and HTTP/SSE for web clients (n8n compatible)
@@ -17,6 +20,84 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 - ✅ **Rate Limiting**: Built-in rate limiting to prevent API abuse
 - ✅ **Error Handling**: Comprehensive error handling and logging
 - ✅ **Audit Logging**: Track all operations for compliance
+
+## What's New in v2.0 🚀
+
+Version 2.0 expands the EWS MCP Server from **28 MVP tools to 40 enterprise-grade tools**, adding powerful new capabilities:
+
+### New Tools (12 additions)
+
+#### Folder Management (4 tools)
+- **create_folder** - Create new mailbox folders with custom folder classes
+- **delete_folder** - Delete folders (soft or permanent)
+- **rename_folder** - Rename existing folders
+- **move_folder** - Move folders to new parent locations
+
+#### Enhanced Attachments (2 tools)
+- **add_attachment** - Add attachments via file path or base64 content with inline support
+- **delete_attachment** - Remove attachments by ID or name
+
+#### Advanced Search (2 tools)
+- **search_by_conversation** - Find all emails in a conversation thread
+- **full_text_search** - Full-text search with case-sensitive and exact phrase options
+
+#### Out-of-Office (2 tools)
+- **set_oof_settings** - Configure automatic replies (Enabled/Scheduled/Disabled)
+- **get_oof_settings** - Retrieve current OOF settings with active status
+
+#### Calendar Enhancement (1 tool)
+- **find_meeting_times** - AI-powered meeting time finder analyzing attendee availability with smart scoring
+
+#### Email Enhancement (1 tool)
+- **copy_email** - Copy emails to folders while preserving originals
+
+### Feature Highlights
+
+**Smart Meeting Scheduling**
+```python
+# Find optimal meeting times across multiple attendees
+find_meeting_times(
+    attendees=["alice@company.com", "bob@company.com", "carol@company.com"],
+    duration_minutes=60,
+    preferences={
+        "prefer_morning": True,
+        "working_hours_start": 9,
+        "working_hours_end": 17,
+        "avoid_lunch": True
+    }
+)
+# Returns scored suggestions with availability analysis
+```
+
+**Conversation Threading**
+```python
+# Track entire email conversations
+search_by_conversation(
+    message_id="email-123"  # or conversation_id directly
+)
+# Returns all emails in the thread
+```
+
+**Advanced Folder Organization**
+```python
+# Organize your mailbox programmatically
+create_folder(folder_name="Projects/2025/Q1", parent_folder="inbox")
+move_folder(folder_id="folder-123", destination_parent_folder="archive")
+rename_folder(folder_id="folder-123", new_name="Completed Projects")
+```
+
+**Out-of-Office Automation**
+```python
+# Schedule OOF for vacation
+set_oof_settings(
+    state="Scheduled",
+    internal_reply="I'm on vacation",
+    external_reply="I'm currently out of office",
+    start_time="2025-12-20T00:00:00",
+    end_time="2025-12-31T23:59:59",
+    external_audience="Known"
+)
+```
 
 ## Quick Start
 

@@ -22,7 +22,7 @@ from .middleware.rate_limiter import RateLimiter
 from .exceptions import EWSMCPException
 from .logging_system import get_logger
 
-# Import all tool classes (40 tools total)
+# Import all tool classes (up to 44 tools total with AI)
 from .tools import (
     # Email tools (8)
     SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEmailDetailsTool,
@@ -46,7 +46,10 @@ from .tools import (
     ListFoldersTool, CreateFolderTool, DeleteFolderTool,
     RenameFolderTool, MoveFolderTool,
     # Out-of-Office tools (2)
-    SetOOFSettingsTool, GetOOFSettingsTool
+    SetOOFSettingsTool, GetOOFSettingsTool,
+    # AI tools (4 - conditionally enabled)
+    SemanticSearchEmailsTool, ClassifyEmailTool,
+    SummarizeEmailTool, SuggestRepliesTool
 )
 
 
@@ -99,7 +102,7 @@ class EWSMCPServer:
             module="main",
             action="SERVER_INIT",
             data={
-                "version": "1.0.0",
+                "version": "2.0.0",
                 "user": self.settings.ews_email,
                 "auth_type": self.settings.ews_auth_type,
                 "server_url": self.settings.ews_server_url or "autodiscover"
@@ -274,6 +277,21 @@ class EWSMCPServer:
             GetOOFSettingsTool
         ])
         self.logger.info("Out-of-Office tools enabled (2 tools)")
+
+        # AI tools (4 tools - conditionally enabled)
+        if self.settings.enable_ai:
+            ai_tools = []
+            if self.settings.enable_semantic_search:
+                ai_tools.append(SemanticSearchEmailsTool)
+            if self.settings.enable_email_classification:
+                ai_tools.append(ClassifyEmailTool)
+            if self.settings.enable_email_summarization:
+                ai_tools.append(SummarizeEmailTool)
+            if self.settings.enable_smart_replies:
+                ai_tools.append(SuggestRepliesTool)
+
+            tool_classes.extend(ai_tools)
+            self.logger.info(f"AI tools enabled ({len(ai_tools)} tools)")
 
         # Instantiate and register tools
         for tool_class in tool_classes:

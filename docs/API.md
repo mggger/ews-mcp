@@ -730,6 +730,395 @@ Get mailbox folder hierarchy with configurable depth and details.
 }
 ```
 
+### create_folder
+
+Create a new mailbox folder with optional parent folder and folder class.
+
+**Input Schema:**
+```json
+{
+  "folder_name": "Projects",           // Required: Name of new folder
+  "parent_folder": "inbox",            // Optional: root, inbox, sent, drafts, etc. (default: inbox)
+  "folder_class": "IPF.Note"           // Optional: Folder class (default: IPF.Note)
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Folder 'Projects' created successfully",
+  "folder_id": "AAMkAGF...",
+  "folder_name": "Projects",
+  "parent_folder": "inbox",
+  "folder_class": "IPF.Note"
+}
+```
+
+### delete_folder
+
+Delete a mailbox folder (soft delete or permanent).
+
+**Input Schema:**
+```json
+{
+  "folder_id": "AAMkAGF...",           // Required: ID of folder to delete
+  "permanent": false                    // Optional: true for hard delete (default: false)
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Folder deleted successfully",
+  "folder_id": "AAMkAGF...",
+  "folder_name": "Old Projects",
+  "permanent": false
+}
+```
+
+### rename_folder
+
+Rename an existing mailbox folder.
+
+**Input Schema:**
+```json
+{
+  "folder_id": "AAMkAGF...",           // Required: ID of folder to rename
+  "new_name": "Archived Projects"      // Required: New folder name
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Folder renamed successfully",
+  "folder_id": "AAMkAGF...",
+  "old_name": "Projects",
+  "new_name": "Archived Projects"
+}
+```
+
+### move_folder
+
+Move a folder to a new parent location.
+
+**Input Schema:**
+```json
+{
+  "folder_id": "AAMkAGF...",                    // Required: ID of folder to move
+  "destination_folder_id": "AAMkAGH...",       // Provide either folder_id...
+  "destination_parent_folder": "archive"        // ...or parent folder name
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Folder moved successfully",
+  "folder_id": "AAMkAGF...",
+  "folder_name": "Q1 Reports",
+  "destination_folder_id": "AAMkAGH..."
+}
+```
+
+## Enhanced Attachment Tools
+
+### add_attachment
+
+Add attachments to draft or existing emails via file path or base64 content.
+
+**Input Schema:**
+```json
+{
+  "message_id": "AAMkAGF...",          // Required: Email message ID
+  "file_path": "/path/to/file.pdf",    // Provide either file_path...
+  "file_content": "base64string...",   // ...or base64 encoded content
+  "file_name": "document.pdf",         // Required if using file_content
+  "content_type": "application/pdf",   // Optional: MIME type (auto-detected for file_path)
+  "is_inline": false,                  // Optional: Inline attachment (default: false)
+  "content_id": "image123"             // Optional: Content ID for inline images
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Attachment added successfully",
+  "attachment_id": "AAMkAGA...",
+  "attachment_name": "document.pdf",
+  "message_id": "AAMkAGF...",
+  "size_bytes": 245760,
+  "is_inline": false
+}
+```
+
+### delete_attachment
+
+Remove attachments from emails by attachment ID or name.
+
+**Input Schema:**
+```json
+{
+  "message_id": "AAMkAGF...",          // Required: Email message ID
+  "attachment_id": "AAMkAGA...",       // Provide either attachment_id...
+  "attachment_name": "old_file.pdf"    // ...or attachment name
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Attachment deleted successfully",
+  "attachment_id": "AAMkAGA...",
+  "attachment_name": "old_file.pdf",
+  "message_id": "AAMkAGF..."
+}
+```
+
+## Advanced Search Tools
+
+### search_by_conversation
+
+Find all emails in a conversation thread.
+
+**Input Schema:**
+```json
+{
+  "conversation_id": "AAQkAGF...",     // Provide either conversation_id...
+  "message_id": "AAMkAGF...",          // ...or message_id (will extract conversation_id)
+  "folder": "inbox",                   // Optional: Folder to search (default: inbox)
+  "max_results": 100                   // Optional: Maximum results (default: 100)
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Found 5 emails in conversation",
+  "conversation_id": "AAQkAGF...",
+  "thread_count": 5,
+  "emails": [
+    {
+      "id": "AAMkAGF1...",
+      "subject": "Project Discussion",
+      "from": "alice@example.com",
+      "to": ["bob@example.com"],
+      "datetime_received": "2025-01-10T09:00:00+00:00",
+      "preview": "Let's discuss the project timeline...",
+      "is_read": true,
+      "has_attachments": false
+    },
+    {
+      "id": "AAMkAGF2...",
+      "subject": "RE: Project Discussion",
+      "from": "bob@example.com",
+      "to": ["alice@example.com"],
+      "datetime_received": "2025-01-10T10:15:00+00:00",
+      "preview": "Sounds good. I propose we...",
+      "is_read": true,
+      "has_attachments": true
+    }
+  ]
+}
+```
+
+### full_text_search
+
+Full-text search across email content with advanced options.
+
+**Input Schema:**
+```json
+{
+  "query": "project budget",           // Required: Search query
+  "folder": "inbox",                   // Optional: Folder to search (default: inbox)
+  "search_in": ["subject", "body"],    // Optional: Where to search (default: both)
+  "case_sensitive": false,             // Optional: Case-sensitive search (default: false)
+  "exact_phrase": false,               // Optional: Exact phrase match (default: false)
+  "max_results": 50                    // Optional: Maximum results (default: 50)
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Found 12 emails matching 'project budget'",
+  "query": "project budget",
+  "result_count": 12,
+  "search_in": ["subject", "body"],
+  "case_sensitive": false,
+  "exact_phrase": false,
+  "emails": [
+    {
+      "id": "AAMkAGF...",
+      "subject": "Q4 Project Budget Approval",
+      "from": "finance@example.com",
+      "datetime_received": "2025-01-08T14:30:00+00:00",
+      "preview": "The project budget has been approved...",
+      "relevance_score": 95
+    }
+  ]
+}
+```
+
+## Out-of-Office Tools
+
+### set_oof_settings
+
+Configure Out-of-Office automatic reply settings.
+
+**Input Schema:**
+```json
+{
+  "state": "Scheduled",                         // Required: Enabled, Scheduled, or Disabled
+  "internal_reply": "I'm out of the office",   // Optional: Message for internal senders
+  "external_reply": "I'm currently away",       // Optional: Message for external senders
+  "start_time": "2025-12-20T00:00:00+00:00",   // Required for Scheduled: ISO 8601 format
+  "end_time": "2025-12-31T23:59:59+00:00",     // Required for Scheduled: ISO 8601 format
+  "external_audience": "Known"                  // Optional: None, Known, All (default: Known)
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Out-of-Office settings updated to Scheduled",
+  "settings": {
+    "state": "Scheduled",
+    "internal_reply": "I'm out of the office",
+    "external_reply": "I'm currently away",
+    "external_audience": "Known",
+    "start_time": "2025-12-20T00:00:00+00:00",
+    "end_time": "2025-12-31T23:59:59+00:00"
+  }
+}
+```
+
+### get_oof_settings
+
+Retrieve current Out-of-Office settings and active status.
+
+**Input Schema:**
+```json
+{}  // No parameters required
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Current OOF state: Scheduled",
+  "settings": {
+    "state": "Scheduled",
+    "internal_reply": "I'm out of the office",
+    "external_reply": "I'm currently away",
+    "external_audience": "Known",
+    "start_time": "2025-12-20T00:00:00+00:00",
+    "end_time": "2025-12-31T23:59:59+00:00",
+    "currently_active": false
+  }
+}
+```
+
+## Calendar Enhancement Tools
+
+### find_meeting_times
+
+AI-powered meeting time finder that analyzes attendee availability and suggests optimal meeting slots with intelligent scoring.
+
+**Input Schema:**
+```json
+{
+  "attendees": [                        // Required: List of attendee emails (1-20)
+    "alice@example.com",
+    "bob@example.com",
+    "carol@example.com"
+  ],
+  "duration_minutes": 60,               // Required: Meeting duration (15-480 minutes)
+  "max_suggestions": 5,                 // Optional: Number of suggestions (default: 5)
+  "start_date": "2025-01-15T00:00:00", // Optional: Search start (default: tomorrow)
+  "end_date": "2025-01-20T23:59:59",   // Optional: Search end (default: 7 days from start)
+  "preferences": {                      // Optional: Scheduling preferences
+    "prefer_morning": true,             // Prefer morning slots (before 12 PM)
+    "prefer_afternoon": false,          // Prefer afternoon slots (after 1 PM)
+    "working_hours_start": 9,           // Working hours start (default: 8)
+    "working_hours_end": 17,            // Working hours end (default: 18)
+    "avoid_lunch": true,                // Avoid 12-1 PM time slots
+    "min_gap_minutes": 15               // Minimum gap between meetings
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Found 5 meeting time suggestions",
+  "duration_minutes": 60,
+  "attendee_count": 3,
+  "suggestions": [
+    {
+      "start_time": "2025-01-15T10:00:00+00:00",
+      "end_time": "2025-01-15T11:00:00+00:00",
+      "duration_minutes": 60,
+      "score": 95,
+      "day_of_week": "Wednesday",
+      "time_of_day": "Morning",
+      "all_attendees_free": true
+    },
+    {
+      "start_time": "2025-01-15T14:00:00+00:00",
+      "end_time": "2025-01-15T15:00:00+00:00",
+      "duration_minutes": 60,
+      "score": 85,
+      "day_of_week": "Wednesday",
+      "time_of_day": "Afternoon",
+      "all_attendees_free": true
+    }
+  ],
+  "suggestion_count": 5,
+  "search_period": {
+    "start": "2025-01-15T00:00:00+00:00",
+    "end": "2025-01-20T23:59:59+00:00"
+  }
+}
+```
+
+## Email Enhancement Tools
+
+### copy_email
+
+Copy an email to another folder while preserving the original.
+
+**Input Schema:**
+```json
+{
+  "message_id": "AAMkAGF...",          // Required: Email message ID
+  "destination_folder": "archive"      // Required: Destination folder name
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Email copied successfully",
+  "message_id": "AAMkAGF...",
+  "copied_message_id": "AAMkAGH...",
+  "source_folder": "inbox",
+  "destination_folder": "archive",
+  "subject": "Important Document"
+}
+```
+
 ## Error Responses
 
 All tools return error responses in the following format:

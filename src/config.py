@@ -58,6 +58,20 @@ class Settings(BaseSettings):
     enable_audit_log: bool = True
     max_attachment_size: int = 157286400  # 150MB
 
+    # AI Features
+    enable_ai: bool = False
+    ai_provider: Literal["openai", "anthropic", "local"] = "openai"
+    ai_api_key: Optional[str] = None
+    ai_model: Optional[str] = None  # e.g., "gpt-4", "claude-3-5-sonnet-20241022"
+    ai_embedding_model: Optional[str] = None  # e.g., "text-embedding-3-small"
+    ai_base_url: Optional[str] = None  # For local models or custom endpoints
+    ai_max_tokens: int = 4096
+    ai_temperature: float = 0.7
+    enable_semantic_search: bool = False
+    enable_email_classification: bool = False
+    enable_smart_replies: bool = False
+    enable_email_summarization: bool = False
+
     @model_validator(mode='after')
     def validate_auth_credentials(self) -> 'Settings':
         """Validate required credentials based on auth type."""
@@ -73,6 +87,21 @@ class Settings(BaseSettings):
         elif self.ews_auth_type in ("basic", "ntlm"):
             if not self.ews_username or not self.ews_password:
                 raise ValueError(f"{self.ews_auth_type.upper()} auth requires ews_username and ews_password")
+
+        # Validate AI settings
+        if self.enable_ai:
+            if not self.ai_api_key and self.ai_provider != "local":
+                raise ValueError(f"AI enabled but ai_api_key not provided for {self.ai_provider}")
+            if not self.ai_model:
+                # Set default models based on provider
+                if self.ai_provider == "openai":
+                    self.ai_model = "gpt-4o-mini"
+                elif self.ai_provider == "anthropic":
+                    self.ai_model = "claude-3-5-sonnet-20241022"
+            if self.enable_semantic_search and not self.ai_embedding_model:
+                # Set default embedding model
+                if self.ai_provider == "openai":
+                    self.ai_embedding_model = "text-embedding-3-small"
 
         return self
 

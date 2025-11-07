@@ -8,6 +8,7 @@ from .attachment_tools import ListAttachmentsTool, DownloadAttachmentTool, AddAt
 from .search_tools import AdvancedSearchTool, SearchByConversationTool, FullTextSearchTool
 from .folder_tools import ListFoldersTool, CreateFolderTool, DeleteFolderTool, RenameFolderTool, MoveFolderTool
 from .oof_tools import SetOOFSettingsTool, GetOOFSettingsTool
+from .ai_tools import SemanticSearchEmailsTool, ClassifyEmailTool, SummarizeEmailTool, SuggestRepliesTool
 
 __all__ = [
     # Email tools (8)
@@ -58,4 +59,9 @@ __all__ = [
     # Out-of-Office tools (2)
     "SetOOFSettingsTool",
     "GetOOFSettingsTool",
+    # AI tools (4)
+    "SemanticSearchEmailsTool",
+    "ClassifyEmailTool",
+    "SummarizeEmailTool",
+    "SuggestRepliesTool",
 ]
