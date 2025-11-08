@@ -421,7 +421,7 @@ class ResolveNamesTool(BaseTool):
         try:
             # Use exchangelib's resolve_names method
             resolved = self.ews_client.account.protocol.resolve_names(
-                unresolved_entries=[name_query],
+                names=[name_query],
                 return_full_contact_data=return_full_info
             )
 
