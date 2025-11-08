@@ -56,6 +56,10 @@ class EWSClient:
             # Use autodiscovery or manual configuration
             if self.config.ews_autodiscover:
                 self.logger.info("Using autodiscovery")
+
+                # Set timeout for autodiscovery
+                BaseProtocol.TIMEOUT = self.config.request_timeout
+
                 account = Account(
                     primary_smtp_address=self.config.ews_email,
                     credentials=credentials,
@@ -68,10 +72,22 @@ class EWSClient:
                     raise ConnectionError("EWS_SERVER_URL required when autodiscover is disabled")
 
                 self.logger.info(f"Using manual configuration: {self.config.ews_server_url}")
+
+                # Create configuration with timeout
                 config = Configuration(
                     server=self.config.ews_server_url,
-                    credentials=credentials
+                    credentials=credentials,
+                    # Set timeout for EWS requests (in seconds)
+                    retry_policy=None,  # Disable built-in retry, we handle it
+                    max_connections=self.config.connection_pool_size
                 )
+
+                # Set timeout on the protocol
+                # exchangelib uses requests library, configure timeout via session
+                if hasattr(config.protocol, 'HTTP_ADAPTER_CLS'):
+                    # Configure HTTP adapter with timeout
+                    BaseProtocol.TIMEOUT = self.config.request_timeout
+
                 account = Account(
                     primary_smtp_address=self.config.ews_email,
                     config=config,

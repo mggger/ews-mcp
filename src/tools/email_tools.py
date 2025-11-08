@@ -256,7 +256,18 @@ class SearchEmailsTool(BaseTool):
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Search emails with filters."""
+        from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+        from exchangelib.errors import ErrorTimeoutExpired
+        import socket
+
         try:
+            # Warn if no date range provided
+            if not kwargs.get("start_date") and not kwargs.get("end_date"):
+                self.logger.warning(
+                    "Searching without date range may be slow for large mailboxes. "
+                    "Consider adding start_date/end_date for better performance."
+                )
+
             # Get folder
             folder_name = kwargs.get("folder", "inbox").lower()
             folder_map = {
@@ -295,28 +306,39 @@ class SearchEmailsTool(BaseTool):
             query = query.order_by('-datetime_received')
             max_results = kwargs.get("max_results", 50)
 
-            # Fetch results
-            emails = []
-            for item in query[:max_results]:
-                # Get sender email safely
-                sender = safe_get(item, "sender", None)
-                from_email = ""
-                if sender and hasattr(sender, "email_address"):
-                    from_email = sender.email_address or ""
+            # Retry wrapper for EWS query execution
+            @retry(
+                stop=stop_after_attempt(2),
+                wait=wait_exponential(multiplier=2, min=4, max=10),
+                retry=retry_if_exception_type((ErrorTimeoutExpired, socket.timeout))
+            )
+            def execute_query():
+                """Execute EWS query with retry logic."""
+                results = []
+                for item in query[:max_results]:
+                    # Get sender email safely
+                    sender = safe_get(item, "sender", None)
+                    from_email = ""
+                    if sender and hasattr(sender, "email_address"):
+                        from_email = sender.email_address or ""
 
-                # Get text body safely
-                text_body = safe_get(item, "text_body", "") or ""
+                    # Get text body safely
+                    text_body = safe_get(item, "text_body", "") or ""
 
-                email_data = {
-                    "message_id": safe_get(item, "id", "unknown"),
-                    "subject": safe_get(item, "subject", "") or "",
-                    "from": from_email,
-                    "received_time": safe_get(item, "datetime_received", datetime.now()).isoformat(),
-                    "is_read": safe_get(item, "is_read", False),
-                    "has_attachments": safe_get(item, "has_attachments", False),
-                    "preview": truncate_text(text_body, 200)
-                }
-                emails.append(email_data)
+                    email_data = {
+                        "message_id": safe_get(item, "id", "unknown"),
+                        "subject": safe_get(item, "subject", "") or "",
+                        "from": from_email,
+                        "received_time": safe_get(item, "datetime_received", datetime.now()).isoformat(),
+                        "is_read": safe_get(item, "is_read", False),
+                        "has_attachments": safe_get(item, "has_attachments", False),
+                        "preview": truncate_text(text_body, 200)
+                    }
+                    results.append(email_data)
+                return results
+
+            # Execute with retry
+            emails = execute_query()
 
             self.logger.info(f"Found {len(emails)} emails matching search criteria")
 
@@ -326,6 +348,18 @@ class SearchEmailsTool(BaseTool):
                 total_count=len(emails)
             )
 
+        except (ErrorTimeoutExpired, socket.timeout) as e:
+            self.logger.error(f"Search timed out: {e}")
+            # Provide helpful error message with suggestions
+            error_msg = (
+                f"Search timed out. Try these optimizations:\n"
+                f"1. Add a date range (start_date and end_date)\n"
+                f"2. Reduce max_results (currently {kwargs.get('max_results', 50)})\n"
+                f"3. Add more specific filters\n"
+                f"4. Increase REQUEST_TIMEOUT in .env (current: {self.ews_client.config.request_timeout}s)\n"
+                f"Example: search_emails(subject_contains='Re: xxx', start_date='2024-11-01', max_results=20)"
+            )
+            raise ToolExecutionError(error_msg)
         except Exception as e:
             self.logger.error(f"Failed to search emails: {e}")
             raise ToolExecutionError(f"Failed to search emails: {e}")
