@@ -6,10 +6,14 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import logging
 import pytz
 from typing import Optional
+import urllib3
 
 from .config import Settings
 from .auth import AuthHandler
 from .exceptions import ConnectionError, AuthenticationError
+
+# Suppress SSL warnings when using NoVerifyHTTPAdapter
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class EWSClient:

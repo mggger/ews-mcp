@@ -9,6 +9,7 @@ from .search_tools import AdvancedSearchTool, SearchByConversationTool, FullText
 from .folder_tools import ListFoldersTool, CreateFolderTool, DeleteFolderTool, RenameFolderTool, MoveFolderTool
 from .oof_tools import SetOOFSettingsTool, GetOOFSettingsTool
 from .ai_tools import SemanticSearchEmailsTool, ClassifyEmailTool, SummarizeEmailTool, SuggestRepliesTool
+from .contact_intelligence_tools import FindPersonTool, GetCommunicationHistoryTool, AnalyzeNetworkTool
 
 __all__ = [
     # Email tools (8)
@@ -64,4 +65,8 @@ __all__ = [
     "ClassifyEmailTool",
     "SummarizeEmailTool",
     "SuggestRepliesTool",
+    # Contact Intelligence tools (3)
+    "FindPersonTool",
+    "GetCommunicationHistoryTool",
+    "AnalyzeNetworkTool",
 ]
