@@ -22,7 +22,7 @@ from .middleware.rate_limiter import RateLimiter
 from .exceptions import EWSMCPException
 from .logging_system import get_logger
 
-# Import all tool classes (up to 44 tools total with AI)
+# Import all tool classes (up to 47 tools total: 43 base + 4 AI)
 from .tools import (
     # Email tools (8)
     SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEmailDetailsTool,
@@ -49,7 +49,9 @@ from .tools import (
     SetOOFSettingsTool, GetOOFSettingsTool,
     # AI tools (4 - conditionally enabled)
     SemanticSearchEmailsTool, ClassifyEmailTool,
-    SummarizeEmailTool, SuggestRepliesTool
+    SummarizeEmailTool, SuggestRepliesTool,
+    # Contact Intelligence tools (3)
+    FindPersonTool, GetCommunicationHistoryTool, AnalyzeNetworkTool
 )
 
 
@@ -190,7 +192,7 @@ class EWSMCPServer:
                 )]
 
     def register_tools(self):
-        """Register all enabled tools (40 total)."""
+        """Register all enabled tools (43 base tools, up to 47 with AI)."""
         tool_classes = []
 
         # Email tools (8 tools)
@@ -241,6 +243,15 @@ class EWSMCPServer:
                 ResolveNamesTool
             ])
             self.logger.info("Contact tools enabled (6 tools)")
+
+        # Contact Intelligence tools (3 tools - always enabled when contacts are enabled)
+        if self.settings.enable_contacts:
+            tool_classes.extend([
+                FindPersonTool,
+                GetCommunicationHistoryTool,
+                AnalyzeNetworkTool
+            ])
+            self.logger.info("Contact Intelligence tools enabled (3 tools)")
 
         # Task tools (5 tools)
         if self.settings.enable_tasks:
@@ -396,12 +407,10 @@ class EWSMCPServer:
                     streams[1],
                     self.server.create_initialization_options(),
                 )
-            return Response()
 
         async def handle_messages(request):
             """Handle POST messages endpoint."""
             await sse.handle_post_message(request.scope, request.receive, request._send)
-            return Response()
 
         # Create Starlette app
         app = Starlette(

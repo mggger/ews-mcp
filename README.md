@@ -9,6 +9,7 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 - ✅ **Email Operations**: Send, read, search, delete, move, **copy** emails with enhanced attachment support
 - ✅ **Calendar Management**: Create, update, delete appointments, respond to meetings, **AI-powered meeting time finder**
 - ✅ **Contact Management**: Full CRUD operations for Exchange contacts
+- ✅ **Contact Intelligence**: Advanced contact search across GAL & email history, communication analytics, network analysis
 - ✅ **Task Management**: Create and manage Exchange tasks
 - ✅ **Folder Management**: Create, delete, rename, move mailbox folders
 - ✅ **Advanced Search**: Conversation threading, full-text search across email content
@@ -21,9 +22,88 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 - ✅ **Error Handling**: Comprehensive error handling and logging
 - ✅ **Audit Logging**: Track all operations for compliance
 
+## What's New in v2.1 🎯
+
+Version 2.1 adds **Contact Intelligence** capabilities with **3 new tools** (bringing total to 43 base tools):
+
+### Contact Intelligence Tools (3 new tools)
+
+#### Unified Contact Search
+- **find_person** - Search across Global Address List (GAL), email history, and domains
+  - Intelligent ranking by communication frequency and recency
+  - Multi-source deduplication (GAL + email history)
+  - Arabic language support (UTF-8)
+  - Domain-wide search (e.g., all contacts from @example.com)
+
+#### Communication Analytics
+- **get_communication_history** - Detailed relationship analysis with any contact
+  - Email volume statistics (sent/received/total)
+  - Communication timeline (monthly aggregation)
+  - Topic extraction from email subjects
+  - Recent emails preview with dates
+
+#### Network Intelligence
+- **analyze_network** - Professional network analysis
+  - Top contacts by email volume
+  - Domain-based organization grouping
+  - Dormant relationship detection (contacts you've lost touch with)
+  - VIP identification (high-volume + recent activity)
+  - Comprehensive overview with summary statistics
+
+### Feature Highlights
+
+**Find Anyone Across Multiple Sources**
+```python
+# Search by name across all sources
+find_person(
+    query="John Doe",
+    search_scope="all",  # Search GAL + email history
+    include_stats=True
+)
+
+# Find all contacts from a specific domain
+find_person(
+    query="@example.com",
+    search_scope="domain"
+)
+```
+
+**Analyze Communication Patterns**
+```python
+# Get detailed history with any contact
+get_communication_history(
+    email="colleague@example.com",
+    days_back=365,
+    include_topics=True
+)
+# Returns: stats, timeline, top topics, recent emails
+```
+
+**Understand Your Professional Network**
+```python
+# Identify VIP contacts (high volume + recent)
+analyze_network(
+    analysis_type="vip",
+    days_back=90,
+    vip_email_threshold=10
+)
+
+# Find dormant relationships to reconnect
+analyze_network(
+    analysis_type="dormant",
+    dormant_threshold_days=60
+)
+
+# Analyze by organization/domain
+analyze_network(
+    analysis_type="by_domain",
+    top_n=20
+)
+```
+
 ## What's New in v2.0 🚀
 
-Version 2.0 expands the EWS MCP Server from **28 MVP tools to 40 enterprise-grade tools**, adding powerful new capabilities:
+Version 2.0 expanded the EWS MCP Server from **28 MVP tools to 40 enterprise-grade tools**, adding powerful new capabilities:
 
 ### New Tools (12 additions)
 
@@ -480,7 +560,28 @@ docker pull ghcr.io/azizmazrou/ews-mcp:main
 
 ## Available Tools
 
-**Total: 28 tools across 6 categories** (⭐ = New in this release)
+**Total: 43 base tools across 9 categories** (up to 47 with AI tools enabled)
+
+### Contact Intelligence Tools (3 tools) ⭐ NEW in v2.1
+
+- **find_person**: Search for contacts across GAL, email history, and domains
+  - Multi-source search with intelligent deduplication
+  - Ranking by communication frequency and recency
+  - Domain-wide search (find all @example.com contacts)
+  - Arabic language support
+
+- **get_communication_history**: Analyze communication with a specific contact
+  - Email statistics (sent, received, total)
+  - Monthly timeline visualization
+  - Topic extraction from subjects
+  - Recent emails preview
+
+- **analyze_network**: Professional network analysis
+  - Top contacts by volume
+  - Domain/organization grouping
+  - Dormant relationship detection
+  - VIP contact identification
+  - Comprehensive overview mode
 
 ### Email Tools (9 tools)
 
