@@ -470,13 +470,13 @@ class CheckAvailabilityTool(BaseTool):
             from exchangelib import Mailbox
             mailboxes = [Mailbox(email_address=email) for email in email_addresses]
 
-            # Get free/busy information
-            availability_data = self.ews_client.account.protocol.get_free_busy_info(
+            # Get free/busy information (convert generator to list)
+            availability_data = list(self.ews_client.account.protocol.get_free_busy_info(
                 accounts=mailboxes,
                 start=start_time,
                 end=end_time,
                 merged_free_busy_interval=interval_minutes
-            )
+            ))
 
             # Format response
             availability_results = []
@@ -629,13 +629,13 @@ class FindMeetingTimesTool(BaseTool):
             # Create mailbox objects for all attendees
             mailboxes = [Mailbox(email_address=email) for email in attendees]
 
-            # Get availability for all attendees
-            availability_data = self.ews_client.account.protocol.get_free_busy_info(
+            # Get availability for all attendees (convert generator to list)
+            availability_data = list(self.ews_client.account.protocol.get_free_busy_info(
                 accounts=mailboxes,
                 start=start_date,
                 end=end_date,
                 merged_free_busy_interval=15  # 15-minute intervals
-            )
+            ))
 
             # Analyze availability and find open slots
             suggestions = []
