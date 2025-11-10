@@ -71,8 +71,20 @@ class ListAttachmentsTool(BaseTool):
                     if not include_inline and is_inline:
                         continue
 
+                    # Extract attachment ID properly
+                    att_id = safe_get(attachment, 'attachment_id', '')
+                    if hasattr(att_id, 'id'):
+                        # AttachmentId object
+                        att_id = att_id.id
+                    elif isinstance(att_id, dict):
+                        # Dictionary
+                        att_id = att_id.get('id', '')
+                    else:
+                        # String or other
+                        att_id = str(att_id) if att_id else ''
+
                     attachment_info = {
-                        "id": safe_get(attachment, 'attachment_id', {}).get('id', ''),
+                        "id": att_id,
                         "name": safe_get(attachment, 'name', 'unnamed'),
                         "size": safe_get(attachment, 'size', 0),
                         "content_type": safe_get(attachment, 'content_type', 'application/octet-stream'),
