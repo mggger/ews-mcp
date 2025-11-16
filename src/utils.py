@@ -10,8 +10,10 @@ from exchangelib.errors import (
     RateLimitError,
     ErrorServerBusy,
     ErrorTimeoutExpired,
-    TransportError
+    TransportError,
+    ResponseMessageError
 )
+from requests.exceptions import HTTPError, ConnectionError, Timeout
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -188,7 +190,7 @@ def handle_ews_errors(func: Callable) -> Callable:
     """Decorator to handle EWS errors with retry logic.
 
     This decorator:
-    1. Automatically retries on rate limit, server busy, and timeout errors
+    1. Automatically retries on rate limit, server busy, timeout, and HTTP errors
     2. Uses exponential backoff (2s, 4s, 8s, 16s)
     3. Maximum 4 retry attempts
     4. Returns structured error responses
@@ -202,14 +204,35 @@ def handle_ews_errors(func: Callable) -> Callable:
     """
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        # Create a retry decorator for this specific call
-        retry_decorator = retry(
-            retry=retry_if_exception_type((
+        # Custom retry condition for HTTP errors (502, 503, 504)
+        def should_retry_http_error(exception):
+            """Check if HTTP error should be retried (502, 503, 504)."""
+            if isinstance(exception, HTTPError):
+                if hasattr(exception, 'response') and exception.response is not None:
+                    status_code = exception.response.status_code
+                    # Retry on transient server errors
+                    return status_code in [502, 503, 504]
+            return False
+
+        # Custom retry condition combining exception types and HTTP errors
+        def should_retry(exception):
+            """Determine if exception should be retried."""
+            # Always retry these exception types
+            if isinstance(exception, (
                 RateLimitError,
                 ErrorServerBusy,
                 ErrorTimeoutExpired,
-                TransportError
-            )),
+                TransportError,
+                ConnectionError,
+                Timeout
+            )):
+                return True
+            # Retry specific HTTP errors
+            return should_retry_http_error(exception)
+
+        # Create a retry decorator for this specific call
+        retry_decorator = retry(
+            retry=should_retry,
             stop=stop_after_attempt(4),
             wait=wait_exponential(multiplier=2, min=2, max=16),
             reraise=True
@@ -246,6 +269,26 @@ def handle_ews_errors(func: Callable) -> Callable:
             return format_error_response(
                 e,
                 context="Network error occurred. Please check connectivity."
+            )
+        except HTTPError as e:
+            logger = logging.getLogger(__name__)
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response else 'unknown'
+            logger.error(f"HTTP error {status_code}: {e}")
+            if status_code in [502, 503, 504]:
+                return format_error_response(
+                    e,
+                    context=f"Server temporarily unavailable (HTTP {status_code}). Retried but failed."
+                )
+            return format_error_response(
+                e,
+                context=f"HTTP error {status_code} occurred."
+            )
+        except (ConnectionError, Timeout) as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Connection error: {e}")
+            return format_error_response(
+                e,
+                context="Connection error. Please check network connectivity and try again."
             )
         except Exception as e:
             logger = logging.getLogger(__name__)

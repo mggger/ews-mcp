@@ -103,12 +103,38 @@ class ListFoldersTool(BaseTool):
                 try:
                     if hasattr(folder, 'children') and folder.children:
                         for child in folder.children:
-                            # Skip hidden folders if not requested
+                            # Skip system/hidden folders if not requested
                             if not include_hidden:
+                                child_name = safe_get(child, 'name', '')
                                 child_class = safe_get(child, 'folder_class', '')
-                                if child_class and 'IPF.Note' not in child_class and 'IPF.Appointment' not in child_class and 'IPF.Contact' not in child_class and 'IPF.Task' not in child_class:
-                                    # This might be a hidden/system folder
-                                    pass
+
+                                # System folders to skip (common Exchange system folders)
+                                system_folder_names = {
+                                    'recoverable items', 'recoverable items deletions',
+                                    'recoverable items purges', 'recoverable items versions',
+                                    'calendar logging', 'conversation action settings',
+                                    'quick step settings', 'suggested contacts',
+                                    'sync issues', 'conflicts', 'local failures',
+                                    'server failures', 'deletions', 'purges', 'versions',
+                                    'audits', 'administrativeaudits', 'conversationhistory',
+                                    'mycontacts', 'peopleconnect', 'quickcontacts',
+                                    'recipientcache', 'skypetelemetry', 'teamchat',
+                                    'workingset', 'companies', 'organizational contacts'
+                                }
+
+                                # Skip if folder name matches system folders
+                                if child_name.lower() in system_folder_names:
+                                    continue
+
+                                # Skip folders starting with special characters
+                                if child_name.startswith('~') or child_name.startswith('_'):
+                                    continue
+
+                                # Skip non-standard folder classes (only keep user-facing types)
+                                if child_class:
+                                    user_facing_classes = ['IPF.Note', 'IPF.Appointment', 'IPF.Contact', 'IPF.Task']
+                                    if not any(cls in child_class for cls in user_facing_classes):
+                                        continue
 
                             child_info = list_folder_tree(child, current_depth + 1, max_depth)
                             if child_info:

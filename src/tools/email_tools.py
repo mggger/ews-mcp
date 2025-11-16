@@ -65,6 +65,55 @@ class SendEmailTool(BaseTool):
         request = self.validate_input(SendEmailRequest, **kwargs)
 
         try:
+            # Validate recipients before sending (helps catch invalid addresses early)
+            all_recipients = request.to + (request.cc or []) + (request.bcc or [])
+            invalid_recipients = []
+            unresolved_external = []
+
+            for recipient in all_recipients:
+                try:
+                    # Try to resolve the recipient via EWS
+                    resolved = self.ews_client.account.protocol.resolve_names(
+                        names=[recipient],
+                        return_full_contact_data=False
+                    )
+                    # Check if resolution succeeded
+                    if not resolved or not any(resolved):
+                        # Recipient couldn't be resolved - determine if internal or external
+                        recipient_domain = recipient.split('@')[1] if '@' in recipient else ''
+                        sender_domain = self.ews_client.account.primary_smtp_address.split('@')[1]
+
+                        if recipient_domain == sender_domain:
+                            # Internal address that can't be resolved - error
+                            invalid_recipients.append(recipient)
+                        else:
+                            # External address that can't be resolved - warning
+                            unresolved_external.append(recipient)
+                            self.logger.warning(f"Could not verify external recipient: {recipient}")
+                except Exception as e:
+                    # resolve_names failed - likely external address
+                    recipient_domain = recipient.split('@')[1] if '@' in recipient else ''
+                    sender_domain = self.ews_client.account.primary_smtp_address.split('@')[1]
+                    if recipient_domain == sender_domain:
+                        invalid_recipients.append(recipient)
+                    else:
+                        unresolved_external.append(recipient)
+                        self.logger.warning(f"Could not validate recipient {recipient}: {e}")
+
+            # Raise error if any internal recipients are invalid
+            if invalid_recipients:
+                raise ToolExecutionError(
+                    f"Invalid or non-existent recipients: {', '.join(invalid_recipients)}"
+                )
+
+            # Warn user about unresolved external recipients
+            if unresolved_external:
+                self.logger.warning(
+                    f"Warning: {len(unresolved_external)} external recipient(s) could not be verified "
+                    f"and may bounce: {', '.join(unresolved_external[:3])}"
+                    + ("..." if len(unresolved_external) > 3 else "")
+                )
+
             # Create message
             message = Message(
                 account=self.ews_client.account,
@@ -156,7 +205,7 @@ class ReadEmailsTool(BaseTool):
         unread_only = kwargs.get("unread_only", False)
 
         try:
-            # Get folder
+            # Get folder with validation
             folder_map = {
                 "inbox": self.ews_client.account.inbox,
                 "sent": self.ews_client.account.sent,
@@ -165,7 +214,12 @@ class ReadEmailsTool(BaseTool):
                 "junk": self.ews_client.account.junk
             }
 
-            folder = folder_map.get(folder_name, self.ews_client.account.inbox)
+            # Validate folder exists - raise error instead of defaulting to inbox
+            if folder_name not in folder_map:
+                raise ToolExecutionError(
+                    f"Folder '{folder_name}' not found. Available folders: {', '.join(folder_map.keys())}"
+                )
+            folder = folder_map[folder_name]
 
             # Build query
             items = folder.all().order_by('-datetime_received')
@@ -266,12 +320,32 @@ class SearchEmailsTool(BaseTool):
         import socket
 
         try:
-            # Warn if no date range provided
+            # Auto-add date range to prevent timeouts in large mailboxes
             if not kwargs.get("start_date") and not kwargs.get("end_date"):
-                self.logger.warning(
-                    "Searching without date range may be slow for large mailboxes. "
-                    "Consider adding start_date/end_date for better performance."
+                # If no other specific filters are provided, enforce a default date range
+                has_filters = (
+                    kwargs.get("subject_contains") or
+                    kwargs.get("from_address") or
+                    kwargs.get("has_attachments") is not None or
+                    kwargs.get("is_read") is not None
                 )
+
+                if not has_filters:
+                    # No filters at all - default to last 30 days to prevent timeout
+                    from datetime import timedelta
+                    default_days_back = 30
+                    auto_start_date = datetime.now() - timedelta(days=default_days_back)
+                    kwargs["start_date"] = auto_start_date.isoformat()
+                    self.logger.info(
+                        f"No filters or date range provided. Automatically limiting search to last {default_days_back} days "
+                        f"to prevent timeout. Specify start_date/end_date to search a different range."
+                    )
+                else:
+                    # Has filters but no date range - warn but allow
+                    self.logger.warning(
+                        "Searching without date range may be slow for large mailboxes. "
+                        "Consider adding start_date/end_date for better performance."
+                    )
 
             # Get folder
             folder_name = kwargs.get("folder", "inbox").lower()
@@ -281,7 +355,12 @@ class SearchEmailsTool(BaseTool):
                 "drafts": self.ews_client.account.drafts,
                 "deleted": self.ews_client.account.trash
             }
-            folder = folder_map.get(folder_name, self.ews_client.account.inbox)
+            # Validate folder exists - raise error instead of defaulting to inbox
+            if folder_name not in folder_map:
+                raise ToolExecutionError(
+                    f"Folder '{folder_name}' not found. Available folders: {', '.join(folder_map.keys())}"
+                )
+            folder = folder_map[folder_name]
 
             # Build query
             query = folder.all()

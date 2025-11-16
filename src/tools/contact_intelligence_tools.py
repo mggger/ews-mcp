@@ -396,13 +396,25 @@ class GetCommunicationHistoryTool(BaseTool):
             recent_emails = []
 
             # 1. Search Inbox (received emails)
+            # Add pagination to prevent timeouts with large mailboxes
+            MAX_ITEMS_TO_SCAN = 2000  # Limit total items scanned to prevent timeout
             inbox = self.ews_client.account.inbox
             received_items = inbox.filter(
                 datetime_received__gte=start_date
-            ).only('sender', 'subject', 'datetime_received', 'text_body')
+            ).order_by('-datetime_received').only('sender', 'subject', 'datetime_received', 'text_body')
 
             received_list = []
+            items_scanned = 0
             for item in received_items:
+                items_scanned += 1
+                if items_scanned > MAX_ITEMS_TO_SCAN:
+                    self.logger.warning(
+                        f"Reached scan limit of {MAX_ITEMS_TO_SCAN} items. "
+                        f"Results may be incomplete for very active contacts. "
+                        f"Consider reducing days_back parameter."
+                    )
+                    break
+
                 sender = safe_get(item, 'sender')
                 if sender:
                     sender_email = safe_get(sender, 'email_address', '').lower()
@@ -441,13 +453,23 @@ class GetCommunicationHistoryTool(BaseTool):
                 })
 
             # 2. Search Sent Items (sent emails)
+            # Add pagination to prevent timeouts with large mailboxes
             sent_items = self.ews_client.account.sent
             sent_query = sent_items.filter(
                 datetime_sent__gte=start_date
-            ).only('to_recipients', 'subject', 'datetime_sent', 'text_body')
+            ).order_by('-datetime_sent').only('to_recipients', 'subject', 'datetime_sent', 'text_body')
 
             sent_list = []
+            items_scanned = 0
             for item in sent_query:
+                items_scanned += 1
+                if items_scanned > MAX_ITEMS_TO_SCAN:
+                    self.logger.warning(
+                        f"Reached scan limit of {MAX_ITEMS_TO_SCAN} items in Sent folder. "
+                        f"Results may be incomplete. Consider reducing days_back parameter."
+                    )
+                    break
+
                 recipients = safe_get(item, 'to_recipients', [])
                 for recipient in recipients:
                     recipient_email = safe_get(recipient, 'email_address', '').lower()
