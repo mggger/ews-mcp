@@ -470,7 +470,8 @@ class GetCommunicationHistoryTool(BaseTool):
                     )
                     break
 
-                recipients = safe_get(item, 'to_recipients', [])
+                # Ensure recipients is always a list (can be None from EWS)
+                recipients = safe_get(item, 'to_recipients', []) or []
                 for recipient in recipients:
                     recipient_email = safe_get(recipient, 'email_address', '').lower()
                     if recipient_email == email:
