@@ -2,8 +2,9 @@
 
 from typing import Any, Dict, List
 from datetime import datetime
-from exchangelib import Message, Mailbox, FileAttachment, HTMLBody
+from exchangelib import Message, Mailbox, FileAttachment, HTMLBody, Body
 from exchangelib.queryset import Q
+import re
 
 from .base import BaseTool
 from ..models import SendEmailRequest, EmailSearchRequest, EmailDetails
@@ -126,16 +127,33 @@ class SendEmailTool(BaseTool):
             if not email_body:
                 raise ToolExecutionError("Email body is empty after processing")
 
-            # Log body length for debugging
-            self.logger.info(f"Email body length: {len(email_body)} characters")
+            # Detect if body is HTML or plain text
+            is_html = bool(re.search(r'<[^>]+>', email_body))  # Check for HTML tags
 
-            # Create message
-            message = Message(
-                account=self.ews_client.account,
-                subject=request.subject,
-                body=HTMLBody(email_body),
-                to_recipients=[Mailbox(email_address=email) for email in request.to]
-            )
+            # Log body details for debugging
+            body_type = "HTML" if is_html else "Plain Text"
+            self.logger.info(f"Email body: {body_type}, {len(email_body)} characters, "
+                           f"{len(email_body.encode('utf-8'))} bytes (UTF-8)")
+
+            # Create message with appropriate body type
+            # CRITICAL: Use HTMLBody for HTML, Body for plain text
+            # Using wrong type causes Exchange to strip content!
+            if is_html:
+                message = Message(
+                    account=self.ews_client.account,
+                    subject=request.subject,
+                    body=HTMLBody(email_body),
+                    to_recipients=[Mailbox(email_address=email) for email in request.to]
+                )
+                self.logger.info("Using HTMLBody for HTML content")
+            else:
+                message = Message(
+                    account=self.ews_client.account,
+                    subject=request.subject,
+                    body=Body(email_body),
+                    to_recipients=[Mailbox(email_address=email) for email in request.to]
+                )
+                self.logger.info("Using Body (plain text) for non-HTML content")
 
             # Add CC recipients
             if request.cc:
@@ -147,6 +165,14 @@ class SendEmailTool(BaseTool):
 
             # Set importance
             message.importance = request.importance.value
+
+            # CRITICAL: Verify body was set correctly BEFORE attaching/sending
+            if not message.body or len(str(message.body).strip()) == 0:
+                raise ToolExecutionError(
+                    f"Message body is empty after creation! Original body length: {len(email_body)}, "
+                    f"Message body: {message.body}"
+                )
+            self.logger.info(f"Verified message body set correctly: {len(str(message.body))} characters")
 
             # Add attachments if provided (must save before sending when attachments are present)
             if request.attachments:
@@ -165,6 +191,15 @@ class SendEmailTool(BaseTool):
                 # Save message with attachments first (required for attachments to be included)
                 message.save()
                 self.logger.info(f"Message saved with {len(request.attachments)} attachment(s)")
+
+                # CRITICAL: Verify body still exists after save()
+                if not message.body or len(str(message.body).strip()) == 0:
+                    raise ToolExecutionError(
+                        "Message body was stripped during save()! "
+                        "This may indicate encoding issue or Exchange policy blocking content."
+                    )
+                self.logger.info(f"Body preserved after save(): {len(str(message.body))} characters")
+
                 # Then send
                 message.send()
                 self.logger.info(f"Message sent with attachments to {', '.join(request.to)}")
@@ -173,11 +208,18 @@ class SendEmailTool(BaseTool):
                 message.send()
                 self.logger.info(f"Message sent (no attachments) to {', '.join(request.to)}")
 
-            # Verify message has body content
-            if hasattr(message, 'body') and message.body:
-                self.logger.info(f"Verified message body exists (length: {len(str(message.body))})")
+            # FINAL VERIFICATION: Check message body after send
+            if hasattr(message, 'body') and message.body and len(str(message.body).strip()) > 0:
+                body_length = len(str(message.body))
+                self.logger.info(f"✅ SUCCESS: Email sent with body content ({body_length} characters)")
             else:
-                self.logger.warning("Message body may be empty after send")
+                # This should not happen, but if it does, it's critical to know
+                raise ToolExecutionError(
+                    "CRITICAL: Message body is empty after send! "
+                    "Email may have been sent without content. "
+                    f"Original body length: {len(email_body)}, "
+                    f"Body type: {body_type}"
+                )
 
             return format_success_response(
                 "Email sent successfully",
