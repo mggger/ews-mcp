@@ -132,7 +132,14 @@ class GetCalendarTool(BaseTool):
                     },
                     "end_date": {
                         "type": "string",
-                        "description": "End date (ISO 8601 format, optional, defaults to 7 days from start)"
+                        "description": "End date (ISO 8601 format, optional, overrides days_ahead)"
+                    },
+                    "days_ahead": {
+                        "type": "integer",
+                        "description": "Number of days ahead to retrieve (default: 7, max: 90)",
+                        "default": 7,
+                        "minimum": 1,
+                        "maximum": 90
                     },
                     "max_results": {
                         "type": "integer",
@@ -158,7 +165,11 @@ class GetCalendarTool(BaseTool):
             if end_date:
                 end_date = parse_datetime_tz_aware(end_date)
             else:
-                end_date = start_date + timedelta(days=7)
+                # Use days_ahead parameter (default: 7, max: 90)
+                days_ahead = kwargs.get("days_ahead", 7)
+                # Enforce maximum of 90 days
+                days_ahead = min(max(1, days_ahead), 90)
+                end_date = start_date + timedelta(days=days_ahead)
 
             max_results = kwargs.get("max_results", 50)
 
