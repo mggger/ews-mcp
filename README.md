@@ -6,7 +6,8 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 
 ## Features
 
-- ✅ **Email Operations**: Send, read, search, delete, move, **copy** emails with enhanced attachment support
+- ✅ **Email Operations**: Send, read, search, delete, move, **copy** emails with **fixed** attachment support
+- ✅ **Attachment Content Extraction**: Read text from PDF, DOCX, XLSX, TXT files (Arabic/UTF-8 support)
 - ✅ **Calendar Management**: Create, update, delete appointments, respond to meetings, **AI-powered meeting time finder**
 - ✅ **Contact Management**: Full CRUD operations for Exchange contacts
 - ✅ **Contact Intelligence**: Advanced contact search across GAL & email history, communication analytics, network analysis
@@ -18,9 +19,9 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 - ✅ **Timezone Support**: Proper handling of timezones (tested with Asia/Riyadh, UTC, etc.)
 - ✅ **HTTP/SSE Transport**: Support for both stdio and HTTP/SSE for web clients (n8n compatible)
 - ✅ **Docker Ready**: Production-ready containerization with best practices
-- ✅ **Rate Limiting**: Built-in rate limiting to prevent API abuse
-- ✅ **Error Handling**: Comprehensive error handling and logging
-- ✅ **Audit Logging**: Track all operations for compliance
+- ✅ **Rate Limiting**: Built-in rate limiting with automatic retry (exponential backoff)
+- ✅ **Error Handling**: Comprehensive error handling with @handle_ews_errors decorator
+- ✅ **Audit Logging**: Track all operations for compliance (logs to stderr only)
 
 ## What's New in v2.1 🎯
 
@@ -560,7 +561,7 @@ docker pull ghcr.io/azizmazrou/ews-mcp:main
 
 ## Available Tools
 
-**Total: 43 base tools across 9 categories** (up to 47 with AI tools enabled)
+**Total: 44 base tools across 9 categories** (up to 48 with AI tools enabled)
 
 ### Contact Intelligence Tools (3 tools) ⭐ NEW in v2.1
 
@@ -585,7 +586,7 @@ docker pull ghcr.io/azizmazrou/ews-mcp:main
 
 ### Email Tools (9 tools)
 
-- **send_email**: Send emails with attachments and CC/BCC
+- **send_email**: Send emails with attachments and CC/BCC (✅ **FIXED:** Attachments now actually send!)
 - **read_emails**: Read emails from specified folder
 - **search_emails**: Search with advanced filters
 - **get_email_details**: Get full email details
@@ -594,6 +595,18 @@ docker pull ghcr.io/azizmazrou/ews-mcp:main
 - **update_email**: ⭐ Update email properties (read status, flags, categories, importance)
 - **list_attachments**: ⭐ List all attachments for an email message
 - **download_attachment**: ⭐ Download email attachments (base64 or save to file)
+
+### Attachment Tools (5 tools) 🆕
+
+- **list_attachments**: List all attachments in an email
+- **download_attachment**: Download attachment as base64 or save to file
+- **add_attachment**: Add attachments to draft emails
+- **delete_attachment**: Remove attachments from emails
+- **read_attachment**: ⭐ **NEW!** Extract text from PDF, DOCX, XLSX, TXT files
+  - Supports Arabic (UTF-8) text
+  - Table extraction from documents
+  - Page limits for large PDFs
+  - Returns structured text content
 
 ### Calendar Tools (6 tools)
 

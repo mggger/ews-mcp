@@ -37,9 +37,9 @@ from .tools import (
     # Task tools (5)
     CreateTaskTool, GetTasksTool, UpdateTaskTool,
     CompleteTaskTool, DeleteTaskTool,
-    # Attachment tools (4)
+    # Attachment tools (5)
     ListAttachmentsTool, DownloadAttachmentTool,
-    AddAttachmentTool, DeleteAttachmentTool,
+    AddAttachmentTool, DeleteAttachmentTool, ReadAttachmentTool,
     # Search tools (3)
     AdvancedSearchTool, SearchByConversationTool, FullTextSearchTool,
     # Folder tools (5)
@@ -209,15 +209,16 @@ class EWSMCPServer:
             ])
             self.logger.info("Email tools enabled (8 tools)")
 
-        # Attachment tools (4 tools - email-related)
+        # Attachment tools (5 tools - email-related)
         if self.settings.enable_email:
             tool_classes.extend([
                 ListAttachmentsTool,
                 DownloadAttachmentTool,
                 AddAttachmentTool,
-                DeleteAttachmentTool
+                DeleteAttachmentTool,
+                ReadAttachmentTool
             ])
-            self.logger.info("Attachment tools enabled (4 tools)")
+            self.logger.info("Attachment tools enabled (5 tools)")
 
         # Calendar tools (7 tools)
         if self.settings.enable_calendar:

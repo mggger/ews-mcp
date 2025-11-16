@@ -1,9 +1,10 @@
 """Pydantic models for EWS MCP Server."""
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 
 
 class ImportanceLevel(str, Enum):
@@ -30,7 +31,7 @@ class ResponseType(str, Enum):
 
 # Email Models
 class SendEmailRequest(BaseModel):
-    """Request model for sending email."""
+    """Request model for sending email with attachment validation."""
     to: List[EmailStr] = Field(..., description="Recipient email addresses")
     subject: str = Field(..., min_length=1, description="Email subject")
     body: str = Field(..., description="Email body (HTML supported)")
@@ -39,6 +40,16 @@ class SendEmailRequest(BaseModel):
     importance: ImportanceLevel = ImportanceLevel.NORMAL
     sensitivity: SensitivityLevel = SensitivityLevel.NORMAL
     attachments: Optional[List[str]] = Field(None, description="Attachment file paths")
+
+    @field_validator("attachments")
+    @classmethod
+    def validate_attachments(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate that attachment files exist."""
+        if v:
+            for file_path in v:
+                if not Path(file_path).exists():
+                    raise ValueError(f"Attachment file not found: {file_path}")
+        return v
 
 
 class SendEmailResponse(BaseModel):
@@ -183,3 +194,32 @@ class ListResponse(BaseModel):
     items: List[dict]
     total_count: int
     has_more: bool
+
+
+# Attachment Models
+class ReadAttachmentRequest(BaseModel):
+    """Request model for reading attachment content."""
+    message_id: str = Field(..., description="Email message ID")
+    attachment_name: str = Field(..., description="Name of attachment to read")
+    extract_tables: bool = Field(default=False, description="Extract tables from document")
+    max_pages: int = Field(default=50, ge=1, le=500, description="Maximum pages for PDF")
+
+
+# Contact Intelligence Models
+class FindPersonRequest(BaseModel):
+    """Request model for finding person across multiple sources."""
+    query: str = Field(..., min_length=1, description="Name, email, or domain to search")
+    search_scope: Literal["all", "gal", "email_history", "domain"] = Field(
+        default="all",
+        description="Where to search: all, gal (Global Address List), email_history, or domain"
+    )
+    include_stats: bool = Field(default=True, description="Include communication statistics")
+    time_range_days: int = Field(default=365, ge=1, le=1825, description="Days back to search")
+    max_results: int = Field(default=50, ge=1, le=100, description="Maximum results to return")
+
+
+class CommunicationHistoryRequest(BaseModel):
+    """Request model for getting communication history."""
+    email: EmailStr = Field(..., description="Email address to analyze")
+    days_back: int = Field(default=365, ge=1, le=1825, description="Days back to analyze")
+    max_emails: int = Field(default=100, ge=1, le=500, description="Maximum emails to retrieve")
