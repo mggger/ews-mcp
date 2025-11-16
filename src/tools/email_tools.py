@@ -114,11 +114,26 @@ class SendEmailTool(BaseTool):
                     + ("..." if len(unresolved_external) > 3 else "")
                 )
 
+            # Clean and prepare email body
+            email_body = request.body.strip()
+
+            # Strip CDATA wrapper if present (CDATA is XML syntax, not needed for Exchange)
+            if email_body.startswith('<![CDATA[') and email_body.endswith(']]>'):
+                email_body = email_body[9:-3].strip()  # Remove <![CDATA[ and ]]>
+                self.logger.info("Stripped CDATA wrapper from email body")
+
+            # Validate body is not empty after processing
+            if not email_body:
+                raise ToolExecutionError("Email body is empty after processing")
+
+            # Log body length for debugging
+            self.logger.info(f"Email body length: {len(email_body)} characters")
+
             # Create message
             message = Message(
                 account=self.ews_client.account,
                 subject=request.subject,
-                body=HTMLBody(request.body),
+                body=HTMLBody(email_body),
                 to_recipients=[Mailbox(email_address=email) for email in request.to]
             )
 
@@ -149,12 +164,20 @@ class SendEmailTool(BaseTool):
 
                 # Save message with attachments first (required for attachments to be included)
                 message.save()
+                self.logger.info(f"Message saved with {len(request.attachments)} attachment(s)")
                 # Then send
                 message.send()
+                self.logger.info(f"Message sent with attachments to {', '.join(request.to)}")
             else:
                 # Send directly if no attachments
                 message.send()
-            self.logger.info(f"Email sent successfully to {', '.join(request.to)}")
+                self.logger.info(f"Message sent (no attachments) to {', '.join(request.to)}")
+
+            # Verify message has body content
+            if hasattr(message, 'body') and message.body:
+                self.logger.info(f"Verified message body exists (length: {len(str(message.body))})")
+            else:
+                self.logger.warning("Message body may be empty after send")
 
             return format_success_response(
                 "Email sent successfully",
