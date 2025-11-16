@@ -44,11 +44,23 @@ class SendEmailRequest(BaseModel):
     @field_validator("attachments")
     @classmethod
     def validate_attachments(cls, v: Optional[List[str]]) -> Optional[List[str]]:
-        """Validate that attachment files exist."""
+        """Validate that attachment files exist and are readable."""
         if v:
             for file_path in v:
-                if not Path(file_path).exists():
+                path = Path(file_path)
+                if not path.exists():
                     raise ValueError(f"Attachment file not found: {file_path}")
+                if not path.is_file():
+                    raise ValueError(f"Attachment path is not a file: {file_path}")
+                # Check if file is readable by attempting to open it
+                try:
+                    with open(file_path, 'rb') as f:
+                        # Just check if we can open it, don't read content
+                        pass
+                except PermissionError:
+                    raise ValueError(f"Permission denied: Cannot read attachment file: {file_path}")
+                except Exception as e:
+                    raise ValueError(f"Cannot access attachment file {file_path}: {str(e)}")
         return v
 
 
