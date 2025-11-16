@@ -184,9 +184,19 @@ class FindPersonTool(BaseTool):
             raise ToolExecutionError(f"Failed to search for person: {e}")
 
     async def _search_gal(self, query: str) -> List[Dict[str, Any]]:
-        """Search Global Address List."""
+        """Search Global Address List with UTF-8/Unicode support."""
         try:
+            # Log query details for debugging (especially important for non-ASCII)
+            query_bytes = query.encode('utf-8')
+            self.logger.info(f"GAL search query: '{query}' ({len(query)} chars, {len(query_bytes)} bytes UTF-8)")
+
+            # Detect if query contains non-ASCII characters (e.g., Arabic, Chinese)
+            has_non_ascii = any(ord(char) > 127 for char in query)
+            if has_non_ascii:
+                self.logger.info(f"Query contains non-ASCII characters (UTF-8 encoded)")
+
             # Use exchangelib's resolve_names for GAL search
+            # IMPORTANT: resolve_names may not handle non-ASCII well in all Exchange versions
             resolved = self.ews_client.account.protocol.resolve_names(
                 names=[query],
                 return_full_contact_data=True,
@@ -212,10 +222,17 @@ class FindPersonTool(BaseTool):
 
                     results.append(contact)
 
+            if len(results) == 0 and has_non_ascii:
+                self.logger.warning(
+                    f"GAL search returned 0 results for non-ASCII query '{query}'. "
+                    f"This may indicate Exchange Server limitation with Unicode characters. "
+                    f"Recommendation: Use email address or Latin transliteration for search."
+                )
+
             return results
 
         except Exception as e:
-            self.logger.warning(f"GAL search failed: {e}")
+            self.logger.error(f"GAL search failed for query '{query}': {e}")
             return []
 
     async def _search_email_history(
