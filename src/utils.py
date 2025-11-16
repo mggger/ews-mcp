@@ -1,10 +1,23 @@
 """Utility functions for EWS MCP Server."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 import logging
 import os
+import functools
 from exchangelib import EWSTimeZone, EWSDateTime, EWSDate
+from exchangelib.errors import (
+    RateLimitError,
+    ErrorServerBusy,
+    ErrorTimeoutExpired,
+    TransportError
+)
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type
+)
 import pytz
 
 
@@ -169,3 +182,77 @@ def format_success_response(message: str, **kwargs) -> Dict[str, Any]:
     }
     response.update(kwargs)
     return response
+
+
+def handle_ews_errors(func: Callable) -> Callable:
+    """Decorator to handle EWS errors with retry logic.
+
+    This decorator:
+    1. Automatically retries on rate limit, server busy, and timeout errors
+    2. Uses exponential backoff (2s, 4s, 8s, 16s)
+    3. Maximum 4 retry attempts
+    4. Returns structured error responses
+    5. Logs all errors for debugging
+
+    Usage:
+        @handle_ews_errors
+        async def my_tool_execute(self, **kwargs):
+            # Your EWS operations here
+            pass
+    """
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        # Create a retry decorator for this specific call
+        retry_decorator = retry(
+            retry=retry_if_exception_type((
+                RateLimitError,
+                ErrorServerBusy,
+                ErrorTimeoutExpired,
+                TransportError
+            )),
+            stop=stop_after_attempt(4),
+            wait=wait_exponential(multiplier=2, min=2, max=16),
+            reraise=True
+        )
+
+        try:
+            # Apply retry logic to the function
+            retried_func = retry_decorator(func)
+            return await retried_func(*args, **kwargs)
+        except RateLimitError as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Rate limit exceeded: {e}")
+            return format_error_response(
+                e,
+                context="Rate limit exceeded. Please try again later."
+            )
+        except ErrorServerBusy as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Exchange server busy: {e}")
+            return format_error_response(
+                e,
+                context="Exchange server is currently busy. Please try again."
+            )
+        except ErrorTimeoutExpired as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Operation timeout: {e}")
+            return format_error_response(
+                e,
+                context="Operation timed out. Please try again."
+            )
+        except TransportError as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Network/transport error: {e}")
+            return format_error_response(
+                e,
+                context="Network error occurred. Please check connectivity."
+            )
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
+            return format_error_response(
+                e,
+                context=f"Unexpected error in {func.__name__}"
+            )
+
+    return wrapper

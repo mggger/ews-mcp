@@ -104,7 +104,7 @@ class EWSMCPServer:
             module="main",
             action="SERVER_INIT",
             data={
-                "version": "2.0.0",
+                "version": "2.1.0",
                 "user": self.settings.ews_email,
                 "auth_type": self.settings.ews_auth_type,
                 "server_url": self.settings.ews_server_url or "autodiscover"
@@ -438,7 +438,7 @@ def main():
         server = EWSMCPServer()
         asyncio.run(server.run())
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nShutting down...", file=sys.stderr)
         sys.exit(0)
     except Exception as e:
         print(f"Fatal error: {e}", file=sys.stderr)

@@ -1,38 +1,40 @@
 # GitHub Container Registry Status
 
-## Current Status: 🔴 Not Available Yet
+## Current Status: ✅ Available
 
-Pre-built Docker images are **not yet available** at `ghcr.io/azizmazrou/ews-mcp` because:
+Pre-built Docker images are **now available** at `ghcr.io/azizmazrou/ews-mcp`!
 
-1. ✅ GitHub Actions workflows are configured
-2. ✅ CI/CD pipeline is ready
-3. ⏳ Code is in feature branch (not merged to main yet)
-4. ⏳ Images will be published automatically once merged
+**Latest Version:** v2.1.0
+**Published:** November 2025
+**Downloads:** 86+ (as of Nov 2025)
+**Multi-platform Support:** linux/amd64, linux/arm64
 
-## Why?
+## Quick Start
 
-The GitHub Actions workflow (`.github/workflows/docker-publish.yml`) only triggers on:
-- Push to `main` or `master` branch
-- Version tags (`v1.0.0`, etc.)
-- Manual workflow dispatch
+Pull and run the latest image:
 
-Since we're currently on feature branch `claude/build-ews-mcp-server-011CUnS6qXguHKiiwUTtUtpx`, the images haven't been built yet.
+```bash
+# Pull the latest image
+docker pull ghcr.io/azizmazrou/ews-mcp:latest
 
-## Timeline
+# Run with your configuration
+docker run -d \
+  --name ews-mcp-server \
+  --env-file .env \
+  ghcr.io/azizmazrou/ews-mcp:latest
+```
 
-**Once the PR is merged to main**:
-1. GitHub Actions will automatically trigger
-2. Multi-platform images will be built (amd64 + arm64)
-3. Images will be published to GHCR
-4. Available at: `ghcr.io/azizmazrou/ews-mcp:latest`
+## Available Tags
 
-Estimated time: **5-10 minutes after merge**
+- `latest` - Latest stable release (v2.1.0)
+- `v2.1.0` - Contact Intelligence release
+- `v2.0.0` - Enterprise tools release
+- `main` - Latest commit on main branch
+- `sha-<commit>` - Specific commit
 
-## Workaround: Build Locally
+## Build from Source (Optional)
 
-Until images are published, build locally:
-
-### Quick Build
+If you prefer to build locally or need a custom build:
 
 ```bash
 # Clone repository
@@ -42,15 +44,7 @@ cd ews-mcp
 # Build image
 docker build -t ews-mcp-server:latest .
 
-# Run (Basic Auth example)
-cat > .env <<EOF
-EWS_SERVER_URL=https://mail.company.com/EWS/Exchange.asmx
-EWS_EMAIL=user@company.com
-EWS_AUTH_TYPE=basic
-EWS_USERNAME=user@company.com
-EWS_PASSWORD=your-password
-EOF
-
+# Run
 docker run -d --name ews-mcp --env-file .env ews-mcp-server:latest
 ```
 
@@ -64,47 +58,38 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-## When Will GHCR Images Be Available?
+## Verify Images
 
-**After merge to main**, you'll be able to:
+Check available images and tags:
 
 ```bash
-# Pull pre-built image (FUTURE - after merge)
+# View all available tags
 docker pull ghcr.io/azizmazrou/ews-mcp:latest
+docker images ghcr.io/azizmazrou/ews-mcp
 
-# Run immediately
-docker run -d --env-file .env ghcr.io/azizmazrou/ews-mcp:latest
+# Check package page
+# https://github.com/azizmazrou/ews-mcp/pkgs/container/ews-mcp
 ```
 
-## Verify Workflow Status
+## Build Status
 
-Once merged, check build status:
-1. Go to: https://github.com/azizmazrou/ews-mcp/actions
-2. Look for "Build and Publish Docker Image" workflow
-3. Verify it completes successfully
-4. Check packages: https://github.com/azizmazrou/ews-mcp/pkgs/container/ews-mcp
+GitHub Actions automatically builds and publishes images on:
+- Push to `main` or `master` branch
+- Version tags (`v2.1.0`, etc.)
+- Manual workflow dispatch
 
-## Current Build Time
+**Workflow Status:** https://github.com/azizmazrou/ews-mcp/actions
 
-Building locally takes:
+## Local Build Time
+
+Building from source locally takes:
 - **First build**: ~3-5 minutes
 - **Subsequent builds**: ~1-2 minutes (with cache)
 
-## Documentation Updates
+## Multi-platform Support
 
-All references to `ghcr.io/azizmazrou/ews-mcp:latest` in documentation will work once:
-1. Code is merged to main
-2. GitHub Actions workflow completes
-3. Images are published to GHCR
+Images are built for:
+- **linux/amd64** - Intel/AMD x86_64 systems
+- **linux/arm64** - ARM64 systems (Apple Silicon, ARM servers)
 
-For now, use local builds as shown above.
-
-## Need Pre-built Images Now?
-
-If you need images immediately, you can:
-
-1. **Fork the repository** and merge to your main branch
-2. GitHub Actions will build images for your fork
-3. Available at: `ghcr.io/YOUR-USERNAME/ews-mcp:latest`
-
-Or wait for the official merge (recommended).
+Docker will automatically pull the correct image for your platform.

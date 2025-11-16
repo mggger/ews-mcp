@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ews-mcp-server",
-    version="1.0.0",
+    version="2.1.0",
     description="MCP Server for Microsoft Exchange Web Services",
     author="Your Name",
     author_email="your.email@example.com",

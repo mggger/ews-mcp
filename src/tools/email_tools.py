@@ -84,7 +84,7 @@ class SendEmailTool(BaseTool):
             # Set importance
             message.importance = request.importance.value
 
-            # Add attachments if provided
+            # Add attachments if provided (must save before sending when attachments are present)
             if request.attachments:
                 for file_path in request.attachments:
                     try:
@@ -98,8 +98,13 @@ class SendEmailTool(BaseTool):
                     except Exception as e:
                         self.logger.warning(f"Failed to attach file {file_path}: {e}")
 
-            # Send
-            message.send()
+                # Save message with attachments first (required for attachments to be included)
+                message.save()
+                # Then send
+                message.send()
+            else:
+                # Send directly if no attachments
+                message.send()
             self.logger.info(f"Email sent successfully to {', '.join(request.to)}")
 
             return format_success_response(
