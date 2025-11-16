@@ -438,7 +438,7 @@ def main():
         server = EWSMCPServer()
         asyncio.run(server.run())
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nShutting down...", file=sys.stderr)
         sys.exit(0)
     except Exception as e:
         print(f"Fatal error: {e}", file=sys.stderr)
