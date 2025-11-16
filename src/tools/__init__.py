@@ -4,7 +4,7 @@ from .email_tools import SendEmailTool, ReadEmailsTool, SearchEmailsTool, GetEma
 from .calendar_tools import CreateAppointmentTool, GetCalendarTool, UpdateAppointmentTool, DeleteAppointmentTool, RespondToMeetingTool, CheckAvailabilityTool, FindMeetingTimesTool
 from .contact_tools import CreateContactTool, SearchContactsTool, GetContactsTool, UpdateContactTool, DeleteContactTool, ResolveNamesTool
 from .task_tools import CreateTaskTool, GetTasksTool, UpdateTaskTool, CompleteTaskTool, DeleteTaskTool
-from .attachment_tools import ListAttachmentsTool, DownloadAttachmentTool, AddAttachmentTool, DeleteAttachmentTool
+from .attachment_tools import ListAttachmentsTool, DownloadAttachmentTool, AddAttachmentTool, DeleteAttachmentTool, ReadAttachmentTool
 from .search_tools import AdvancedSearchTool, SearchByConversationTool, FullTextSearchTool
 from .folder_tools import ListFoldersTool, CreateFolderTool, DeleteFolderTool, RenameFolderTool, MoveFolderTool
 from .oof_tools import SetOOFSettingsTool, GetOOFSettingsTool
@@ -42,11 +42,12 @@ __all__ = [
     "UpdateTaskTool",
     "CompleteTaskTool",
     "DeleteTaskTool",
-    # Attachment tools (4)
+    # Attachment tools (5)
     "ListAttachmentsTool",
     "DownloadAttachmentTool",
     "AddAttachmentTool",
     "DeleteAttachmentTool",
+    "ReadAttachmentTool",
     # Search tools (3)
     "AdvancedSearchTool",
     "SearchByConversationTool",
