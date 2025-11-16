@@ -276,13 +276,13 @@ AI_EMBEDDING_MODEL=nomic-embed-text
 - Matrix strategy canceling Python 3.12 tests when 3.11 failed
 - Module import triggering settings validation before needed
 
-### Planned Features
-- Folder management tools
-- Advanced attachment handling
-- Search filters and saved searches
+### Planned Features (Future Roadmap)
 - Webhook support for notifications
-- Microsoft Graph API integration
-- Caching for improved performance
-- Web UI for configuration
-- Metrics and monitoring
+- Microsoft Graph API integration (complementing EWS)
+- Redis caching for improved performance
+- Web UI for configuration and monitoring
+- Metrics and monitoring dashboard
 - Kubernetes deployment manifests
+- Email rules and automation
+- Shared mailbox support
+- Public folder operations
