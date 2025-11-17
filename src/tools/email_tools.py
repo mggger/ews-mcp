@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List
 from datetime import datetime
-from exchangelib import Message, Mailbox, FileAttachment, HTMLBody, Body
+from exchangelib import Message, Mailbox, FileAttachment, HTMLBody, Body, FolderId, Folder
 from exchangelib.queryset import Q
 import re
 
@@ -10,6 +10,121 @@ from .base import BaseTool
 from ..models import SendEmailRequest, EmailSearchRequest, EmailDetails
 from ..exceptions import ToolExecutionError
 from ..utils import format_success_response, safe_get, truncate_text, parse_datetime_tz_aware
+
+
+async def resolve_folder(ews_client, folder_identifier: str):
+    """
+    Resolve folder from name, path, or ID.
+
+    Supports:
+    - Standard names: inbox, sent, drafts, deleted, junk
+    - Folder paths: Inbox/CC, Inbox/Projects/2024
+    - Folder IDs: AAMkADc3MWUy...
+    - Custom folder names: CC, Archive, Projects
+    """
+    folder_identifier = folder_identifier.strip()
+
+    # Standard folders map (lowercase for matching)
+    folder_map = {
+        "inbox": ews_client.account.inbox,
+        "sent": ews_client.account.sent,
+        "drafts": ews_client.account.drafts,
+        "deleted": ews_client.account.trash,
+        "junk": ews_client.account.junk,
+        "trash": ews_client.account.trash,
+        "calendar": ews_client.account.calendar,
+        "contacts": ews_client.account.contacts,
+        "tasks": ews_client.account.tasks
+    }
+
+    # Try 1: Standard folder name (case-insensitive)
+    folder_lower = folder_identifier.lower()
+    if folder_lower in folder_map:
+        return folder_map[folder_lower]
+
+    # Try 2: Folder ID (starts with AAM or similar Exchange ID pattern)
+    if len(folder_identifier) > 50 and not '/' in folder_identifier:
+        try:
+            # Try to get folder by ID
+            folder_id = FolderId(id=folder_identifier)
+            folder = Folder(account=ews_client.account, folder_id=folder_id)
+            # Test if accessible
+            _ = folder.name
+            return folder
+        except Exception:
+            pass  # Not a valid folder ID, continue
+
+    # Try 3: Folder path (e.g., "Inbox/CC" or "Inbox/Projects/2024")
+    if '/' in folder_identifier:
+        parts = folder_identifier.split('/')
+        parent_name = parts[0].strip().lower()
+
+        # Start from a known parent folder
+        if parent_name in folder_map:
+            current_folder = folder_map[parent_name]
+        else:
+            # Default to inbox if parent not recognized
+            current_folder = ews_client.account.inbox
+
+        # Navigate through subfolders
+        for subfolder_name in parts[1:]:
+            subfolder_name = subfolder_name.strip()
+            found = False
+
+            try:
+                for child in current_folder.children:
+                    if safe_get(child, 'name', '').lower() == subfolder_name.lower():
+                        current_folder = child
+                        found = True
+                        break
+            except Exception as e:
+                raise ToolExecutionError(
+                    f"Error accessing subfolders of '{current_folder.name}': {e}"
+                )
+
+            if not found:
+                raise ToolExecutionError(
+                    f"Subfolder '{subfolder_name}' not found under '{current_folder.name}'"
+                )
+
+        return current_folder
+
+    # Try 4: Search for custom folder by name (recursively under inbox)
+    def search_folder_tree(parent, target_name, max_depth=3, current_depth=0):
+        """Recursively search for folder by name."""
+        if current_depth >= max_depth:
+            return None
+
+        try:
+            for child in parent.children:
+                child_name = safe_get(child, 'name', '')
+                if child_name.lower() == target_name.lower():
+                    return child
+                # Recurse into subfolders
+                found = search_folder_tree(child, target_name, max_depth, current_depth + 1)
+                if found:
+                    return found
+        except Exception:
+            pass
+
+        return None
+
+    # Search under inbox first (most common location for custom folders)
+    custom_folder = search_folder_tree(ews_client.account.inbox, folder_identifier)
+    if custom_folder:
+        return custom_folder
+
+    # Search under root as fallback
+    custom_folder = search_folder_tree(ews_client.account.root, folder_identifier)
+    if custom_folder:
+        return custom_folder
+
+    # If all methods fail, provide helpful error
+    raise ToolExecutionError(
+        f"Folder '{folder_identifier}' not found. "
+        f"Available standard folders: {', '.join(folder_map.keys())}. "
+        f"For custom folders, use full path (e.g., 'Inbox/CC') or get folder ID from list_folders."
+    )
 
 
 class SendEmailTool(BaseTool):
@@ -245,7 +360,7 @@ class ReadEmailsTool(BaseTool):
                 "properties": {
                     "folder": {
                         "type": "string",
-                        "description": "Folder name (inbox, sent, drafts, etc.)",
+                        "description": "Folder name (standard names: inbox, sent, drafts; paths: Inbox/CC; or folder ID)",
                         "default": "inbox"
                     },
                     "max_results": {
@@ -265,26 +380,14 @@ class ReadEmailsTool(BaseTool):
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Read emails from folder."""
-        folder_name = kwargs.get("folder", "inbox").lower()
+        folder_name = kwargs.get("folder", "inbox")
         max_results = kwargs.get("max_results", 50)
         unread_only = kwargs.get("unread_only", False)
 
         try:
-            # Get folder with validation
-            folder_map = {
-                "inbox": self.ews_client.account.inbox,
-                "sent": self.ews_client.account.sent,
-                "drafts": self.ews_client.account.drafts,
-                "deleted": self.ews_client.account.trash,
-                "junk": self.ews_client.account.junk
-            }
-
-            # Validate folder exists - raise error instead of defaulting to inbox
-            if folder_name not in folder_map:
-                raise ToolExecutionError(
-                    f"Folder '{folder_name}' not found. Available folders: {', '.join(folder_map.keys())}"
-                )
-            folder = folder_map[folder_name]
+            # Get folder - supports standard names, paths, and folder IDs
+            folder = await resolve_folder(self.ews_client, folder_name)
+            self.logger.info(f"Resolved folder '{folder_name}' to: {safe_get(folder, 'name', folder_name)}")
 
             # Build query
             items = folder.all().order_by('-datetime_received')
@@ -341,7 +444,7 @@ class SearchEmailsTool(BaseTool):
                 "properties": {
                     "folder": {
                         "type": "string",
-                        "description": "Folder to search in",
+                        "description": "Folder to search in (standard names: inbox, sent, drafts; paths: Inbox/CC; or folder ID)",
                         "default": "inbox"
                     },
                     "subject_contains": {
@@ -412,20 +515,10 @@ class SearchEmailsTool(BaseTool):
                         "Consider adding start_date/end_date for better performance."
                     )
 
-            # Get folder
-            folder_name = kwargs.get("folder", "inbox").lower()
-            folder_map = {
-                "inbox": self.ews_client.account.inbox,
-                "sent": self.ews_client.account.sent,
-                "drafts": self.ews_client.account.drafts,
-                "deleted": self.ews_client.account.trash
-            }
-            # Validate folder exists - raise error instead of defaulting to inbox
-            if folder_name not in folder_map:
-                raise ToolExecutionError(
-                    f"Folder '{folder_name}' not found. Available folders: {', '.join(folder_map.keys())}"
-                )
-            folder = folder_map[folder_name]
+            # Get folder - supports standard names, paths, and folder IDs
+            folder_name = kwargs.get("folder", "inbox")
+            folder = await resolve_folder(self.ews_client, folder_name)
+            self.logger.info(f"Resolved folder '{folder_name}' to: {safe_get(folder, 'name', folder_name)}")
 
             # Build query
             query = folder.all()
