@@ -98,10 +98,15 @@ class CreateAppointmentTool(BaseTool):
                     for email in request.attendees
                 ]
 
-            # Save the appointment
-            item.save()
-
-            self.logger.info(f"Created appointment: {request.subject}")
+            # Save the appointment and send meeting invitations if there are attendees
+            if request.attendees:
+                # Send meeting invitations to all attendees
+                item.save(send_meeting_invitations='SendToAllAndSaveCopy')
+                self.logger.info(f"Created appointment with {len(request.attendees)} attendees and sent invitations: {request.subject}")
+            else:
+                # Just save as a personal appointment (no attendees)
+                item.save()
+                self.logger.info(f"Created personal appointment: {request.subject}")
 
             return format_success_response(
                 "Appointment created successfully",
