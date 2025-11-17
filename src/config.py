@@ -30,7 +30,8 @@ class Settings(BaseSettings):
 
     # Server configuration
     mcp_server_name: str = "ews-mcp-server"
-    mcp_transport: Literal["stdio", "sse"] = "stdio"
+    # Supported transports: stdio (default) or the newer Streamable HTTP protocol
+    mcp_transport: Literal["stdio", "streamable_http"] = "streamable_http"
     mcp_host: str = "0.0.0.0"
     mcp_port: int = 8000
     timezone: str = "UTC"

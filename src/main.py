@@ -12,10 +12,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.types import Tool, TextContent
 from starlette.applications import Starlette
 from starlette.routing import Route
+import contextlib
 
 from .config import get_settings
 from .auth import AuthHandler
@@ -383,9 +384,9 @@ class EWSMCPServer:
                         write_stream,
                         self.server.create_initialization_options()
                     )
-            elif self.settings.mcp_transport == "sse":
+            elif self.settings.mcp_transport == "streamable_http":
                 self.logger.info(f"Server ready - listening on http://{self.settings.mcp_host}:{self.settings.mcp_port}")
-                await self.run_sse()
+                await self.run_streamable_http()
 
         except KeyboardInterrupt:
             self.logger.info("Shutting down...")
@@ -397,37 +398,33 @@ class EWSMCPServer:
             self.ews_client.close()
             self.logger.info("Server stopped")
 
-    async def run_sse(self):
-        """Run the MCP server with SSE (HTTP) transport."""
-        from starlette.responses import Response
+    async def run_streamable_http(self):
+        """Run the MCP server with StreamableHTTP transport."""
         import uvicorn
 
-        sse = SseServerTransport("/messages")
+        # Create session manager with stateless mode
+        session_manager = StreamableHTTPSessionManager(
+            app=self.server,
+            event_store=None,  # No event store for basic setup
+            json_response=False,  # Use streaming responses
+            stateless=True,  # Stateless mode for simplicity
+            security_settings=None  # No additional security settings
+        )
 
-        async def handle_sse(request):
-            """Handle SSE connection endpoint."""
-            async with sse.connect_sse(
-                request.scope,
-                request.receive,
-                request._send,
-            ) as streams:
-                await self.server.run(
-                    streams[0],
-                    streams[1],
-                    self.server.create_initialization_options(),
-                )
+        # Create lifespan context manager
+        @contextlib.asynccontextmanager
+        async def lifespan(app: Starlette):
+            """Lifespan context manager for the Starlette app."""
+            async with session_manager.run():
+                yield
 
-        async def handle_messages(request):
-            """Handle POST messages endpoint."""
-            await sse.handle_post_message(request.scope, request.receive, request._send)
-
-        # Create Starlette app
+        # Create Starlette app with single endpoint
         app = Starlette(
             debug=True,
             routes=[
-                Route("/sse", endpoint=handle_sse),
-                Route("/messages", endpoint=handle_messages, methods=["POST"]),
+                Route("/mcp", endpoint=session_manager.handle_request, methods=["GET", "POST", "DELETE"]),
             ],
+            lifespan=lifespan,
         )
 
         # Run with uvicorn
