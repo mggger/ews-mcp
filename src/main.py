@@ -419,13 +419,17 @@ class EWSMCPServer:
                 yield
 
         # Create Starlette app with single endpoint
+        async def streamable_http_app(scope, receive, send):
+            # Delegate the raw ASGI call directly to the session manager
+            await session_manager.handle_request(scope, receive, send)
+
         app = Starlette(
             debug=True,
-            routes=[
-                Route("/mcp", endpoint=session_manager.handle_request, methods=["GET", "POST", "DELETE"]),
-            ],
+            routes=[],
             lifespan=lifespan,
         )
+        # Mount the ASGI endpoint at /mcp (supports GET/POST/DELETE inside handler)
+        app.mount("/mcp", streamable_http_app)
 
         # Run with uvicorn
         config = uvicorn.Config(
