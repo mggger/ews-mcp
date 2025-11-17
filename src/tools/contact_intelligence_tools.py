@@ -184,26 +184,26 @@ class FindPersonTool(BaseTool):
             raise ToolExecutionError(f"Failed to search for person: {e}")
 
     async def _search_gal(self, query: str) -> List[Dict[str, Any]]:
-        """Search Global Address List with UTF-8/Unicode support."""
+        """Search Global Address List using multiple methods."""
+        results = []
+
+        # Log query details
+        query_bytes = query.encode('utf-8')
+        self.logger.info(f"GAL search query: '{query}' ({len(query)} chars, {len(query_bytes)} bytes UTF-8)")
+
+        has_non_ascii = any(ord(char) > 127 for char in query)
+        if has_non_ascii:
+            self.logger.info(f"Query contains non-ASCII characters (UTF-8)")
+
+        # METHOD 1: Try resolve_names (works for exact/prefix matches)
         try:
-            # Log query details for debugging (especially important for non-ASCII)
-            query_bytes = query.encode('utf-8')
-            self.logger.info(f"GAL search query: '{query}' ({len(query)} chars, {len(query_bytes)} bytes UTF-8)")
-
-            # Detect if query contains non-ASCII characters (e.g., Arabic, Chinese)
-            has_non_ascii = any(ord(char) > 127 for char in query)
-            if has_non_ascii:
-                self.logger.info(f"Query contains non-ASCII characters (UTF-8 encoded)")
-
-            # Use exchangelib's resolve_names for GAL search
-            # IMPORTANT: resolve_names may not handle non-ASCII well in all Exchange versions
+            self.logger.info("Method 1: Trying resolve_names API")
             resolved = self.ews_client.account.protocol.resolve_names(
                 names=[query],
                 return_full_contact_data=True,
                 search_scope='ActiveDirectory'
             )
 
-            results = []
             for resolution in resolved:
                 if resolution and hasattr(resolution, 'mailbox'):
                     mailbox = resolution.mailbox
@@ -213,27 +213,127 @@ class FindPersonTool(BaseTool):
                         "routing_type": safe_get(mailbox, 'routing_type', 'SMTP'),
                     }
 
-                    # Add additional contact details if available
+                    # Add additional contact details
                     if hasattr(resolution, 'contact'):
                         contact_info = resolution.contact
                         contact["company"] = safe_get(contact_info, 'company_name', '')
                         contact["job_title"] = safe_get(contact_info, 'job_title', '')
                         contact["department"] = safe_get(contact_info, 'department', '')
 
-                    results.append(contact)
+                    # Avoid duplicates
+                    if not any(r["email"] == contact["email"] for r in results):
+                        results.append(contact)
 
-            if len(results) == 0 and has_non_ascii:
+            self.logger.info(f"Method 1 (resolve_names): Found {len(results)} contacts")
+        except Exception as e:
+            self.logger.warning(f"Method 1 (resolve_names) failed: {e}")
+
+        # METHOD 2: Try searching Contacts folder (if exists)
+        try:
+            self.logger.info("Method 2: Trying Contacts folder search")
+            contacts_folder = self.ews_client.account.contacts
+
+            # Search by display name or email
+            from exchangelib import Q
+            search_filter = (
+                Q(display_name__icontains=query) |
+                Q(email_addresses__contains=query) |
+                Q(given_name__icontains=query) |
+                Q(surname__icontains=query)
+            )
+
+            contacts_results = contacts_folder.filter(search_filter).only(
+                'display_name', 'email_addresses', 'company_name',
+                'job_title', 'department', 'given_name', 'surname'
+            )
+
+            for contact in contacts_results[:50]:  # Limit to 50
+                # Get primary email
+                email_addresses = safe_get(contact, 'email_addresses', [])
+                email = ""
+                if email_addresses and len(email_addresses) > 0:
+                    email = safe_get(email_addresses[0], 'email', '')
+
+                if email:
+                    contact_data = {
+                        "name": safe_get(contact, 'display_name', ''),
+                        "email": email.lower(),
+                        "company": safe_get(contact, 'company_name', ''),
+                        "job_title": safe_get(contact, 'job_title', ''),
+                        "department": safe_get(contact, 'department', ''),
+                        "routing_type": "SMTP"
+                    }
+
+                    # Avoid duplicates
+                    if not any(r["email"] == contact_data["email"] for r in results):
+                        results.append(contact_data)
+
+            self.logger.info(f"Method 2 (Contacts folder): Found {len(results) - len([r for r in results if 'Method 1' in str(r)])} new contacts")
+        except Exception as e:
+            self.logger.warning(f"Method 2 (Contacts folder) failed: {e}")
+
+        # METHOD 3: Try wildcard resolve_names (for partial matches)
+        if len(results) == 0 and not has_non_ascii:
+            try:
+                self.logger.info("Method 3: Trying wildcard resolve_names")
+                # Add wildcards for partial matching
+                wildcard_queries = [
+                    f"{query}*",  # Prefix match
+                    f"*{query}*",  # Contains
+                ]
+
+                for wq in wildcard_queries:
+                    try:
+                        resolved = self.ews_client.account.protocol.resolve_names(
+                            names=[wq],
+                            return_full_contact_data=True,
+                            search_scope='ActiveDirectory'
+                        )
+
+                        for resolution in resolved:
+                            if resolution and hasattr(resolution, 'mailbox'):
+                                mailbox = resolution.mailbox
+                                contact = {
+                                    "name": safe_get(mailbox, 'name', ''),
+                                    "email": safe_get(mailbox, 'email_address', ''),
+                                    "routing_type": safe_get(mailbox, 'routing_type', 'SMTP'),
+                                }
+
+                                if hasattr(resolution, 'contact'):
+                                    contact_info = resolution.contact
+                                    contact["company"] = safe_get(contact_info, 'company_name', '')
+                                    contact["job_title"] = safe_get(contact_info, 'job_title', '')
+                                    contact["department"] = safe_get(contact_info, 'department', '')
+
+                                # Avoid duplicates
+                                if not any(r["email"] == contact["email"] for r in results):
+                                    results.append(contact)
+
+                    except Exception:
+                        pass  # Wildcard may not be supported
+
+                self.logger.info(f"Method 3 (wildcard): Total results now: {len(results)}")
+            except Exception as e:
+                self.logger.warning(f"Method 3 (wildcard) failed: {e}")
+
+        # Final result
+        self.logger.info(f"GAL search complete: {len(results)} total contacts found")
+
+        if len(results) == 0:
+            if has_non_ascii:
                 self.logger.warning(
                     f"GAL search returned 0 results for non-ASCII query '{query}'. "
-                    f"This may indicate Exchange Server limitation with Unicode characters. "
-                    f"Recommendation: Use email address or Latin transliteration for search."
+                    f"Exchange Server may not support Unicode in GAL search. "
+                    f"Try: (1) Search by email address, (2) Use email_history scope, (3) Use Latin characters"
+                )
+            else:
+                self.logger.warning(
+                    f"GAL search returned 0 results for '{query}'. "
+                    f"Person may not exist in Global Address List. "
+                    f"Try: (1) Search by full email address, (2) Use email_history scope"
                 )
 
-            return results
-
-        except Exception as e:
-            self.logger.error(f"GAL search failed for query '{query}': {e}")
-            return []
+        return results
 
     async def _search_email_history(
         self,
