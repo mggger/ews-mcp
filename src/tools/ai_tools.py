@@ -3,7 +3,7 @@
 from typing import Any, Dict
 from .base import BaseTool
 from ..exceptions import ToolExecutionError
-from ..utils import format_success_response, safe_get
+from ..utils import format_success_response, safe_get, find_message_across_folders
 from ..ai import get_ai_provider, get_embedding_provider, EmailClassificationService, EmbeddingService
 
 
@@ -166,23 +166,8 @@ class ClassifyEmailTool(BaseTool):
 
             classification_service = EmailClassificationService(ai_provider)
 
-            # Find email
-            folders_to_search = [
-                ("inbox", self.ews_client.account.inbox),
-                ("sent", self.ews_client.account.sent),
-                ("drafts", self.ews_client.account.drafts)
-            ]
-
-            message = None
-            for folder_name, folder in folders_to_search:
-                try:
-                    message = folder.get(id=message_id)
-                    break
-                except Exception:
-                    continue
-
-            if not message:
-                raise ToolExecutionError(f"Email with ID {message_id} not found")
+            # Find message across all folders (including custom subfolders)
+            message = find_message_across_folders(self.ews_client, message_id)
 
             # Extract email details
             subject = safe_get(message, 'subject', '')
@@ -255,23 +240,8 @@ class SummarizeEmailTool(BaseTool):
 
             classification_service = EmailClassificationService(ai_provider)
 
-            # Find email
-            folders_to_search = [
-                ("inbox", self.ews_client.account.inbox),
-                ("sent", self.ews_client.account.sent),
-                ("drafts", self.ews_client.account.drafts)
-            ]
-
-            message = None
-            for folder_name, folder in folders_to_search:
-                try:
-                    message = folder.get(id=message_id)
-                    break
-                except Exception:
-                    continue
-
-            if not message:
-                raise ToolExecutionError(f"Email with ID {message_id} not found")
+            # Find message across all folders (including custom subfolders)
+            message = find_message_across_folders(self.ews_client, message_id)
 
             # Extract email details
             subject = safe_get(message, 'subject', '')
@@ -343,23 +313,8 @@ class SuggestRepliesTool(BaseTool):
 
             classification_service = EmailClassificationService(ai_provider)
 
-            # Find email
-            folders_to_search = [
-                ("inbox", self.ews_client.account.inbox),
-                ("sent", self.ews_client.account.sent),
-                ("drafts", self.ews_client.account.drafts)
-            ]
-
-            message = None
-            for folder_name, folder in folders_to_search:
-                try:
-                    message = folder.get(id=message_id)
-                    break
-                except Exception:
-                    continue
-
-            if not message:
-                raise ToolExecutionError(f"Email with ID {message_id} not found")
+            # Find message across all folders (including custom subfolders)
+            message = find_message_across_folders(self.ews_client, message_id)
 
             # Extract email details
             subject = safe_get(message, 'subject', '')

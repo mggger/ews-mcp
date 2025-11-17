@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .base import BaseTool
 from ..exceptions import ToolExecutionError
-from ..utils import format_success_response, safe_get
+from ..utils import format_success_response, safe_get, find_message_across_folders
 
 
 class ListAttachmentsTool(BaseTool):
@@ -43,24 +43,8 @@ class ListAttachmentsTool(BaseTool):
             raise ToolExecutionError("message_id is required")
 
         try:
-            # Find the message across common folders
-            message = None
-            folders_to_search = [
-                self.ews_client.account.inbox,
-                self.ews_client.account.sent,
-                self.ews_client.account.drafts
-            ]
-
-            for folder in folders_to_search:
-                try:
-                    message = folder.get(id=message_id)
-                    if message:
-                        break
-                except Exception:
-                    continue
-
-            if not message:
-                raise ToolExecutionError(f"Message not found: {message_id}")
+            # Find message across all folders (including custom subfolders)
+            message = find_message_across_folders(self.ews_client, message_id)
 
             # List attachments
             attachments = []
@@ -160,24 +144,8 @@ class DownloadAttachmentTool(BaseTool):
             raise ToolExecutionError("save_path is required when return_as is 'file_path'")
 
         try:
-            # Find the message across common folders
-            message = None
-            folders_to_search = [
-                self.ews_client.account.inbox,
-                self.ews_client.account.sent,
-                self.ews_client.account.drafts
-            ]
-
-            for folder in folders_to_search:
-                try:
-                    message = folder.get(id=message_id)
-                    if message:
-                        break
-                except Exception:
-                    continue
-
-            if not message:
-                raise ToolExecutionError(f"Message not found: {message_id}")
+            # Find message across all folders (including custom subfolders)
+            message = find_message_across_folders(self.ews_client, message_id)
 
             # Find the attachment
             attachment = None
@@ -534,24 +502,8 @@ class ReadAttachmentTool(BaseTool):
             raise ToolExecutionError("attachment_name is required")
 
         try:
-            # Find the message across common folders
-            message = None
-            folders_to_search = [
-                self.ews_client.account.inbox,
-                self.ews_client.account.sent,
-                self.ews_client.account.drafts
-            ]
-
-            for folder in folders_to_search:
-                try:
-                    message = folder.get(id=message_id)
-                    if message:
-                        break
-                except Exception:
-                    continue
-
-            if not message:
-                raise ToolExecutionError(f"Message not found: {message_id}")
+            # Find message across all folders (including custom subfolders)
+            message = find_message_across_folders(self.ews_client, message_id)
 
             # Find the attachment by name
             attachment = None

@@ -299,3 +299,58 @@ def handle_ews_errors(func: Callable) -> Callable:
             )
 
     return wrapper
+
+
+def find_message_across_folders(ews_client, message_id):
+    """
+    Search for a message across multiple folders.
+
+    This function searches common folders for a message by ID, including
+    custom subfolders. This is necessary because Exchange Web Services
+    requires knowing which folder a message is in to retrieve it.
+
+    Args:
+        ews_client: The EWS client instance
+        message_id: The Exchange message ID to find
+
+    Returns:
+        The message item if found
+
+    Raises:
+        ToolExecutionError if message not found in any folder
+    """
+    from .exceptions import ToolExecutionError
+
+    # List of common folders to search (in priority order)
+    folders_to_search = [
+        ("inbox", ews_client.account.inbox),
+        ("sent", ews_client.account.sent),
+        ("drafts", ews_client.account.drafts),
+        ("deleted", ews_client.account.trash),
+        ("junk", ews_client.account.junk),
+    ]
+
+    # Also search custom subfolders under inbox (like CC, Archive, etc.)
+    try:
+        for child in ews_client.account.inbox.children:
+            child_name = safe_get(child, 'name', 'unknown')
+            folders_to_search.append((f"inbox/{child_name}", child))
+    except Exception:
+        pass  # If we can't list subfolders, continue with standard folders
+
+    # Search each folder for the message
+    for folder_name, folder in folders_to_search:
+        try:
+            item = folder.get(id=message_id)
+            if item:
+                return item
+        except Exception:
+            # Message not in this folder, continue searching
+            continue
+
+    # If we get here, message wasn't found in any folder
+    raise ToolExecutionError(
+        f"Message not found: {message_id}. "
+        f"The message may have been deleted, moved to a folder not in the search path, "
+        f"or the ID may be invalid."
+    )

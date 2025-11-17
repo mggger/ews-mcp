@@ -9,7 +9,7 @@ import re
 from .base import BaseTool
 from ..models import SendEmailRequest, EmailSearchRequest, EmailDetails
 from ..exceptions import ToolExecutionError
-from ..utils import format_success_response, safe_get, truncate_text, parse_datetime_tz_aware
+from ..utils import format_success_response, safe_get, truncate_text, parse_datetime_tz_aware, find_message_across_folders
 
 
 async def resolve_folder(ews_client, folder_identifier: str):
@@ -643,8 +643,8 @@ class GetEmailDetailsTool(BaseTool):
         message_id = kwargs.get("message_id")
 
         try:
-            # Find message
-            item = self.ews_client.account.inbox.get(id=message_id)
+            # Find message across all folders (including custom subfolders)
+            item = find_message_across_folders(self.ews_client, message_id)
 
             # Get sender email safely
             sender = safe_get(item, "sender", None)
@@ -719,8 +719,8 @@ class DeleteEmailTool(BaseTool):
         permanent = kwargs.get("permanent", False)
 
         try:
-            # Find and delete message
-            item = self.ews_client.account.inbox.get(id=message_id)
+            # Find message across all folders (including custom subfolders)
+            item = find_message_across_folders(self.ews_client, message_id)
 
             if permanent:
                 item.delete()
@@ -783,8 +783,8 @@ class MoveEmailTool(BaseTool):
             if not dest_folder:
                 raise ToolExecutionError(f"Unknown folder: {dest_folder_name}")
 
-            # Find and move message
-            item = self.ews_client.account.inbox.get(id=message_id)
+            # Find message across all folders (including custom subfolders)
+            item = find_message_across_folders(self.ews_client, message_id)
             item.move(dest_folder)
 
             self.logger.info(f"Email {message_id} moved to {dest_folder_name}")
