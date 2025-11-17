@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List
 from datetime import datetime
-from exchangelib import Message, Mailbox, FileAttachment, HTMLBody, Body, FolderId, Folder
+from exchangelib import Message, Mailbox, FileAttachment, HTMLBody, Body, Folder
 from exchangelib.queryset import Q
 import re
 
@@ -43,16 +43,28 @@ async def resolve_folder(ews_client, folder_identifier: str):
         return folder_map[folder_lower]
 
     # Try 2: Folder ID (starts with AAM or similar Exchange ID pattern)
+    # Note: Direct folder ID access requires navigating the folder tree to find matching ID
+    # This is a TODO for future enhancement - for now, use folder paths or names
     if len(folder_identifier) > 50 and not '/' in folder_identifier:
-        try:
-            # Try to get folder by ID
-            folder_id = FolderId(id=folder_identifier)
-            folder = Folder(account=ews_client.account, folder_id=folder_id)
-            # Test if accessible
-            _ = folder.name
-            return folder
-        except Exception:
-            pass  # Not a valid folder ID, continue
+        # Folder ID detection - try to find in tree
+        def find_folder_by_id(parent, target_id):
+            """Recursively search for folder by ID."""
+            try:
+                if safe_get(parent, 'id', '') == target_id:
+                    return parent
+                if hasattr(parent, 'children') and parent.children:
+                    for child in parent.children:
+                        result = find_folder_by_id(child, target_id)
+                        if result:
+                            return result
+            except Exception:
+                pass
+            return None
+
+        # Search root tree for folder ID
+        found_folder = find_folder_by_id(ews_client.account.root, folder_identifier)
+        if found_folder:
+            return found_folder
 
     # Try 3: Folder path (e.g., "Inbox/CC" or "Inbox/Projects/2024")
     if '/' in folder_identifier:
