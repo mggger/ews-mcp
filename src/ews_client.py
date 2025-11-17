@@ -28,6 +28,35 @@ class EWSClient:
         # Configure exchangelib
         BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
+    def _normalize_server_url(self, server_url: str) -> str:
+        """
+        Normalize server URL to full EWS endpoint.
+        
+        Args:
+            server_url: Server URL which can be:
+                - Full URL: https://owa.example.com/ews/exchange.asmx
+                - Domain with path: owa.example.com/ews/exchange.asmx
+                - Domain only: owa.example.com
+        
+        Returns:
+            Full EWS endpoint URL with https:// and /ews/exchange.asmx path
+        """
+        url = server_url.strip()
+        
+        # Add https:// if not present
+        if not url.startswith(('http://', 'https://')):
+            url = f'https://{url}'
+        
+        # Add /ews/exchange.asmx if not present
+        # Check for common EWS endpoint paths (case insensitive)
+        lower_url = url.lower()
+        if not (lower_url.endswith('/ews/exchange.asmx') or '/ews/exchange.asmx' in lower_url):
+            # Remove trailing slash if present
+            url = url.rstrip('/')
+            url = f'{url}/ews/exchange.asmx'
+        
+        return url
+
     @property
     def account(self) -> Account:
         """Lazy load account connection."""
@@ -75,11 +104,13 @@ class EWSClient:
                 if not self.config.ews_server_url:
                     raise ConnectionError("EWS_SERVER_URL required when autodiscover is disabled")
 
-                self.logger.info(f"Using manual configuration: {self.config.ews_server_url}")
+                # Normalize the server URL to full EWS endpoint
+                service_endpoint = self._normalize_server_url(self.config.ews_server_url)
+                self.logger.info(f"Using manual configuration: {service_endpoint}")
 
                 # Create configuration with timeout
                 config = Configuration(
-                    server=self.config.ews_server_url,
+                    service_endpoint=service_endpoint,
                     credentials=credentials,
                     # Set timeout for EWS requests (in seconds)
                     retry_policy=None,  # Disable built-in retry, we handle it
