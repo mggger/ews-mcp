@@ -29,8 +29,8 @@ class EWSClient:
         # Configure exchangelib
         BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
         
-        if platform.system() == 'Darwin' and self.config.ews_auth_type == 'ntlm':
-            self.logger.info("Using pyspnego for NTLM authentication (macOS compatibility)")
+        if self.config.ews_auth_type == 'ntlm':
+            self.logger.info(f"Using pyspnego for NTLM authentication ({platform.system()})")
 
     @property
     def account(self) -> Account:

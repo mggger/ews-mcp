@@ -14,6 +14,7 @@ uvicorn>=0.23.0
 # Authentication
 msal==1.26.0
 requests==2.31.0
+pyspnego>=0.10.0  # NTLM authentication (cross-platform)
 
 # Utilities
 tenacity==8.2.3

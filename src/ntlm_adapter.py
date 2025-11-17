@@ -1,4 +1,4 @@
-"""Custom NTLM adapter using pyspnego for macOS compatibility."""
+"""Custom NTLM adapter using pyspnego for cross-platform compatibility."""
 
 import base64
 import spnego
@@ -10,10 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class PySpnegoNtlmAuth(AuthBase):
-    """NTLM authentication using pyspnego (works on macOS with OpenSSL 3.x).
+    """NTLM authentication using pyspnego for cross-platform compatibility.
     
     This implementation mimics requests-ntlm but uses pyspnego which has
-    pure Python MD4 implementation, avoiding OpenSSL 3.x MD4 deprecation issues.
+    pure Python MD4 implementation, avoiding OpenSSL 3.x MD4 deprecation issues
+    on macOS and providing more reliable NTLM authentication in Docker containers.
     """
     
     def __init__(self, username, password):

@@ -1,7 +1,8 @@
 """Main MCP Server implementation for Exchange Web Services."""
 
-# Apply macOS NTLM patch FIRST (before any other imports)
-from . import macos_patch
+# Apply NTLM patch FIRST (before any other imports)
+# This ensures pyspnego is used for NTLM on all platforms
+from . import ntlm_patch
 
 import asyncio
 import logging
@@ -327,15 +328,8 @@ class EWSMCPServer:
             # Test connection
             self.logger.info("Testing Exchange connection...")
             
-            # Use HTTP client for NTLM on macOS
-            import platform
-            if platform.system() == 'Darwin' and self.settings.ews_auth_type == 'ntlm':
-                from .ews_http_client import EWSHttpClient
-                http_client = EWSHttpClient(self.settings)
-                connection_ok = http_client.test_connection()
-                http_client.close()
-            else:
-                connection_ok = self.ews_client.test_connection()
+            # Use standard EWS client (now uses pyspnego on all platforms)
+            connection_ok = self.ews_client.test_connection()
             
             if not connection_ok:
                 self.logger.error("Failed to connect to Exchange server")
