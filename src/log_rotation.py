@@ -5,7 +5,7 @@ Automatically archives old logs and removes outdated archives.
 
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import shutil
 import gzip
 import logging
@@ -13,7 +13,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def rotate_logs(log_dir: Path = Path("/app/logs"), keep_days: int = 30):
+def rotate_logs(log_dir: Optional[Path] = None, keep_days: int = 30):
+    if log_dir is None:
+        log_dir = Path("logs")
     """Rotate old logs to daily archives.
 
     Args:
@@ -79,7 +81,9 @@ def rotate_logs(log_dir: Path = Path("/app/logs"), keep_days: int = 30):
     }
 
 
-def get_disk_usage(log_dir: Path = Path("/app/logs")) -> Dict[str, Any]:
+def get_disk_usage(log_dir: Optional[Path] = None) -> Dict[str, Any]:
+    if log_dir is None:
+        log_dir = Path("logs")
     """Get disk usage statistics for log directory.
 
     Args:

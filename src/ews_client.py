@@ -1,5 +1,6 @@
 """Exchange Web Services client wrapper."""
 
+import platform
 from exchangelib import Account, Configuration, DELEGATE, Version, EWSTimeZone
 from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -27,6 +28,9 @@ class EWSClient:
 
         # Configure exchangelib
         BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+        
+        if platform.system() == 'Darwin' and self.config.ews_auth_type == 'ntlm':
+            self.logger.info("Using pyspnego for NTLM authentication (macOS compatibility)")
 
     @property
     def account(self) -> Account:
@@ -77,20 +81,15 @@ class EWSClient:
 
                 self.logger.info(f"Using manual configuration: {self.config.ews_server_url}")
 
-                # Create configuration with timeout
-                config = Configuration(
-                    server=self.config.ews_server_url,
-                    credentials=credentials,
-                    # Set timeout for EWS requests (in seconds)
-                    retry_policy=None,  # Disable built-in retry, we handle it
-                    max_connections=self.config.connection_pool_size
-                )
+                # Set timeout globally before creating configuration
+                BaseProtocol.TIMEOUT = self.config.request_timeout
 
-                # Set timeout on the protocol
-                # exchangelib uses requests library, configure timeout via session
-                if hasattr(config.protocol, 'HTTP_ADAPTER_CLS'):
-                    # Configure HTTP adapter with timeout
-                    BaseProtocol.TIMEOUT = self.config.request_timeout
+                # Create configuration using service_endpoint parameter
+                # Use the exact same approach as the working test.py
+                config = Configuration(
+                    service_endpoint=self.config.ews_server_url,
+                    credentials=credentials
+                )
 
                 account = Account(
                     primary_smtp_address=self.config.ews_email,

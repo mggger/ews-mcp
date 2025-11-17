@@ -12,7 +12,9 @@ from datetime import datetime, timedelta
 class LogAnalyzer:
     """Analyze logs for patterns, issues, and insights."""
 
-    def __init__(self, log_dir: Path = Path("/app/logs")):
+    def __init__(self, log_dir: Optional[Path] = None):
+        if log_dir is None:
+            log_dir = Path("logs")
         """Initialize the log analyzer.
 
         Args:

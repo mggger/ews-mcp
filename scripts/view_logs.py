@@ -7,11 +7,14 @@ Provides quick access to log analysis and filtering.
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
+from typing import Optional
 import sys
 import argparse
 
 
-def view_recent_logs(log_file: str, lines: int = 50, log_dir: Path = Path("/app/logs")):
+def view_recent_logs(log_file: str, lines: int = 50, log_dir: Optional[Path] = None):
+    if log_dir is None:
+        log_dir = Path("logs")
     """View recent log entries.
 
     Args:
@@ -69,7 +72,9 @@ def format_log_entry(entry: dict) -> str:
     return f"{color}[{timestamp}] [{level:8s}] [{module:15s}] {action:25s} -> {status}{reset_color}"
 
 
-def search_logs(log_file: str, keyword: str, log_dir: Path = Path("/app/logs")):
+def search_logs(log_file: str, keyword: str, log_dir: Optional[Path] = None):
+    if log_dir is None:
+        log_dir = Path("logs")
     """Search logs for keyword.
 
     Args:
@@ -103,7 +108,9 @@ def search_logs(log_file: str, keyword: str, log_dir: Path = Path("/app/logs")):
                 print(f"    Error: {error}")
 
 
-def show_error_summary(hours: int = 24, log_dir: Path = Path("/app/logs")):
+def show_error_summary(hours: int = 24, log_dir: Optional[Path] = None):
+    if log_dir is None:
+        log_dir = Path("logs")
     """Show summary of errors.
 
     Args:
@@ -148,7 +155,9 @@ def show_error_summary(hours: int = 24, log_dir: Path = Path("/app/logs")):
             print()
 
 
-def show_performance_summary(hours: int = 24, log_dir: Path = Path("/app/logs")):
+def show_performance_summary(hours: int = 24, log_dir: Optional[Path] = None):
+    if log_dir is None:
+        log_dir = Path("logs")
     """Show performance summary.
 
     Args:
@@ -219,7 +228,7 @@ def main():
     parser.add_argument('--keyword', help='Keyword to search for (for search command)')
     parser.add_argument('--hours', type=int, default=24,
                        help='Number of hours to analyze')
-    parser.add_argument('--log-dir', type=Path, default=Path('/app/logs'),
+    parser.add_argument('--log-dir', type=Path, default=Path('logs'),
                        help='Log directory path')
 
     args = parser.parse_args()

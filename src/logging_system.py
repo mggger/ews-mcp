@@ -14,12 +14,15 @@ import uuid
 class LogManager:
     """Central logging management for EWS MCP Server."""
 
-    def __init__(self, log_dir: Path = Path("/app/logs")):
+    def __init__(self, log_dir: Optional[Path] = None):
         """Initialize the logging system.
 
         Args:
-            log_dir: Directory for log files (default: /app/logs)
+            log_dir: Directory for log files (default: ./logs in current directory)
         """
+        if log_dir is None:
+            # Use relative path in current directory
+            log_dir = Path("logs")
         self.log_dir = log_dir
         self.session_id = f"sess_{uuid.uuid4().hex[:8]}"
         self.setup_logging()

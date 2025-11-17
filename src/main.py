@@ -1,5 +1,8 @@
 """Main MCP Server implementation for Exchange Web Services."""
 
+# Apply macOS NTLM patch FIRST (before any other imports)
+from . import macos_patch
+
 import asyncio
 import logging
 import os
@@ -323,7 +326,18 @@ class EWSMCPServer:
 
             # Test connection
             self.logger.info("Testing Exchange connection...")
-            if not self.ews_client.test_connection():
+            
+            # Use HTTP client for NTLM on macOS
+            import platform
+            if platform.system() == 'Darwin' and self.settings.ews_auth_type == 'ntlm':
+                from .ews_http_client import EWSHttpClient
+                http_client = EWSHttpClient(self.settings)
+                connection_ok = http_client.test_connection()
+                http_client.close()
+            else:
+                connection_ok = self.ews_client.test_connection()
+            
+            if not connection_ok:
                 self.logger.error("Failed to connect to Exchange server")
                 self.logger.error("Please check your configuration and credentials")
 
