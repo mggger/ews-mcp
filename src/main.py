@@ -402,12 +402,12 @@ class EWSMCPServer:
         """Run the MCP server with StreamableHTTP transport."""
         import uvicorn
 
-        # Create session manager with stateless mode
+        # Create session manager with stateful mode
         session_manager = StreamableHTTPSessionManager(
             app=self.server,
             event_store=None,  # No event store for basic setup
             json_response=False,  # Use streaming responses
-            stateless=True,  # Stateless mode for simplicity
+            stateless=False,  # Stateful mode - maintain sessions
             security_settings=None  # No additional security settings
         )
 
@@ -418,18 +418,60 @@ class EWSMCPServer:
             async with session_manager.run():
                 yield
 
-        # Create Starlette app with single endpoint
-        async def streamable_http_app(scope, receive, send):
-            # Delegate the raw ASGI call directly to the session manager
+        # Create endpoint wrapper that converts Starlette request to ASGI
+        async def mcp_endpoint(request):
+            """Wrapper to call session_manager.handle_request with ASGI parameters."""
+            scope = request.scope
+            receive = request.receive
+            
+            # Create a custom send that captures the response
+            response_started = False
+            status_code = 200
+            headers = []
+            body_parts = []
+            
+            async def send(message):
+                nonlocal response_started, status_code, headers
+                if message["type"] == "http.response.start":
+                    response_started = True
+                    status_code = message["status"]
+                    headers = message.get("headers", [])
+                elif message["type"] == "http.response.body":
+                    body_parts.append(message.get("body", b""))
+            
+            # Call the actual handler
             await session_manager.handle_request(scope, receive, send)
-
-        app = Starlette(
+            
+            # Return Starlette response
+            from starlette.responses import Response
+            body = b"".join(body_parts)
+            # Decode headers from bytes to strings
+            decoded_headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in headers}
+            return Response(content=body, status_code=status_code, headers=decoded_headers)
+        
+        # Create Starlette app with single normalized endpoint
+        starlette_app = Starlette(
             debug=True,
-            routes=[],
+            routes=[
+                Route("/mcp/", endpoint=mcp_endpoint, methods=["GET", "POST", "DELETE"]),
+            ],
             lifespan=lifespan,
         )
-        # Mount the ASGI endpoint at /mcp (supports GET/POST/DELETE inside handler)
-        app.mount("/mcp", streamable_http_app)
+
+        # ASGI wrapper to intercept and normalize paths before Starlette routing
+        class ASGIPathNormalizer:
+            def __init__(self, app):
+                self.app = app
+
+            async def __call__(self, scope, receive, send):
+                # Normalize /mcp to /mcp/ at ASGI level (before Starlette routing)
+                if scope["type"] == "http" and scope["path"] == "/mcp":
+                    scope["path"] = "/mcp/"
+                    scope["raw_path"] = b"/mcp/"
+                await self.app(scope, receive, send)
+
+        # Wrap Starlette app with path normalizer
+        app = ASGIPathNormalizer(starlette_app)
 
         # Run with uvicorn
         config = uvicorn.Config(
