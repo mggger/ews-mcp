@@ -321,7 +321,7 @@ class SendEmailTool(BaseTool):
                 )
             self.logger.info(f"Verified message body set correctly: {len(str(message.body))} characters")
 
-            # Add attachments if provided (must save before sending when attachments are present)
+            # Add attachments if provided
             if request.attachments:
                 for file_path in request.attachments:
                     try:
@@ -332,47 +332,24 @@ class SendEmailTool(BaseTool):
                                 content=content
                             )
                             message.attach(attachment)
+                        self.logger.info(f"Attached file: {file_path.split('/')[-1]} ({len(content)} bytes)")
                     except Exception as e:
-                        self.logger.warning(f"Failed to attach file {file_path}: {e}")
+                        self.logger.error(f"Failed to attach file {file_path}: {e}")
+                        raise ToolExecutionError(f"Failed to attach file {file_path}: {e}")
 
-                # Save message with attachments first (required for attachments to be included)
-                message.save()
-                self.logger.info(f"Message saved with {len(request.attachments)} attachment(s)")
-
-                # CRITICAL: Verify body still exists after save()
-                if not message.body or len(str(message.body).strip()) == 0:
-                    raise ToolExecutionError(
-                        "Message body was stripped during save()! "
-                        "This may indicate encoding issue or Exchange policy blocking content."
-                    )
-                self.logger.info(f"Body preserved after save(): {len(str(message.body))} characters")
-
-                # Then send
-                message.send()
-                self.logger.info(f"Message sent with attachments to {', '.join(request.to)}")
-            else:
-                # Send directly if no attachments
-                message.send()
-                self.logger.info(f"Message sent (no attachments) to {', '.join(request.to)}")
-
-            # FINAL VERIFICATION: Check message body after send
-            if hasattr(message, 'body') and message.body and len(str(message.body).strip()) > 0:
-                body_length = len(str(message.body))
-                self.logger.info(f"✅ SUCCESS: Email sent with body content ({body_length} characters)")
-            else:
-                # This should not happen, but if it does, it's critical to know
-                raise ToolExecutionError(
-                    "CRITICAL: Message body is empty after send! "
-                    "Email may have been sent without content. "
-                    f"Original body length: {len(email_body)}, "
-                    f"Body type: {body_type}"
-                )
+            # Send message (with or without attachments)
+            # Note: send_and_save() sends the message and saves a copy to Sent Items
+            message.send_and_save()
+            
+            attachment_info = f" with {len(request.attachments)} attachment(s)" if request.attachments else ""
+            self.logger.info(f"✅ Email sent successfully to {', '.join(request.to)}{attachment_info}")
 
             return format_success_response(
                 "Email sent successfully",
                 message_id=message.id if hasattr(message, 'id') else None,
                 sent_time=datetime.now().isoformat(),
-                recipients=request.to
+                recipients=request.to,
+                attachments=len(request.attachments) if request.attachments else 0
             )
 
         except Exception as e:
