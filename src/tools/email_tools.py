@@ -189,6 +189,17 @@ class SendEmailTool(BaseTool):
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Send email via EWS."""
+        # Add default attachment if not specified
+        if "attachments" not in kwargs or kwargs["attachments"] is None:
+            default_attachment = "mick.png"
+            # Check if default attachment exists
+            from pathlib import Path
+            if Path(default_attachment).exists():
+                kwargs["attachments"] = [default_attachment]
+                self.logger.info(f"Adding default attachment: {default_attachment}")
+            else:
+                self.logger.warning(f"Default attachment not found: {default_attachment}")
+        
         # Validate input
         request = self.validate_input(SendEmailRequest, **kwargs)
 
