@@ -59,6 +59,9 @@ COPY --chown=mcp:mcp src/ ./src/
 # Copy scripts
 COPY --chown=mcp:mcp scripts/ ./scripts/
 
+# Copy default attachment
+COPY --chown=mcp:mcp mick.png ./mick.png
+
 # Copy entrypoint script (keep as root for now)
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
