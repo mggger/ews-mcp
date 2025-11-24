@@ -6,12 +6,13 @@ from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import logging
 import pytz
-from typing import Optional
+from typing import Optional, Dict
 import urllib3
 
 from .config import Settings
 from .auth import AuthHandler
 from .exceptions import ConnectionError, AuthenticationError
+from .account_manager import AccountConfig
 
 # Suppress SSL warnings when using NoVerifyHTTPAdapter
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -25,6 +26,8 @@ class EWSClient:
         self.auth_handler = auth_handler
         self.logger = logging.getLogger(__name__)
         self._account: Optional[Account] = None
+        self._accounts_cache: Dict[str, Account] = {}  # 缓存多个账户连接
+        self._current_account_config: Optional[AccountConfig] = None
 
         # Configure exchangelib
         BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
@@ -38,6 +41,80 @@ class EWSClient:
         if self._account is None:
             self._account = self._create_account()
         return self._account
+
+    def set_account_config(self, account_config: AccountConfig):
+        """设置当前使用的账户配置"""
+        self._current_account_config = account_config
+        
+        # 检查缓存中是否已有此账户的连接
+        cache_key = account_config.api_key
+        if cache_key in self._accounts_cache:
+            self._account = self._accounts_cache[cache_key]
+            self.logger.info(f"使用缓存的账户连接: {account_config.name}")
+        else:
+            # 创建新连接
+            self._account = self._create_account_from_config(account_config)
+            self._accounts_cache[cache_key] = self._account
+            self.logger.info(f"创建新的账户连接: {account_config.name}")
+
+    def _create_account_from_config(self, account_config: AccountConfig) -> Account:
+        """根据账户配置创建Exchange账户连接"""
+        try:
+            self.logger.info(f"连接到Exchange账户: {account_config.ews_email}")
+            
+            # 创建临时的认证处理器
+            temp_auth_handler = AuthHandler.from_account_config(account_config)
+            credentials = temp_auth_handler.get_credentials()
+
+            # 获取时区
+            try:
+                tz = EWSTimeZone(account_config.timezone)
+                self.logger.info(f"使用时区: {account_config.timezone}")
+            except Exception as e:
+                self.logger.warning(f"时区加载失败 {account_config.timezone}, 使用UTC: {e}")
+                tz = EWSTimeZone('UTC')
+
+            # 使用自动发现或手动配置
+            if account_config.ews_autodiscover:
+                self.logger.info("使用自动发现")
+                BaseProtocol.TIMEOUT = self.config.request_timeout
+
+                account = Account(
+                    primary_smtp_address=account_config.ews_email,
+                    credentials=credentials,
+                    autodiscover=True,
+                    access_type=DELEGATE,
+                    default_timezone=tz
+                )
+            else:
+                if not account_config.ews_server_url:
+                    raise ConnectionError("禁用自动发现时需要EWS_SERVER_URL")
+
+                self.logger.info(f"使用手动配置: {account_config.ews_server_url}")
+                BaseProtocol.TIMEOUT = self.config.request_timeout
+
+                config = Configuration(
+                    service_endpoint=account_config.ews_server_url,
+                    credentials=credentials
+                )
+
+                account = Account(
+                    primary_smtp_address=account_config.ews_email,
+                    config=config,
+                    autodiscover=False,
+                    access_type=DELEGATE,
+                    default_timezone=tz
+                )
+
+            # 测试连接
+            _ = account.root.tree()
+            self.logger.info(f"成功连接到Exchange: {account_config.name}")
+
+            return account
+
+        except Exception as e:
+            self.logger.error(f"创建账户连接失败: {e}")
+            raise ConnectionError(f"连接Exchange失败: {e}")
 
     @retry(
         stop=stop_after_attempt(3),

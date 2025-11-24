@@ -29,6 +29,9 @@ htmlcov/
 .env.local
 .env.*.local
 
+# Multi-account configuration (contains sensitive credentials)
+accounts.json
+
 # Logs
 *.log
 logs/*

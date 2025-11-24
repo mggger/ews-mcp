@@ -26,6 +26,7 @@ from .middleware.error_handler import ErrorHandler
 from .middleware.rate_limiter import RateLimiter
 from .exceptions import EWSMCPException
 from .logging_system import get_logger
+from .account_manager import AccountManager
 
 # Import all tool classes (up to 47 tools total: 43 base + 4 AI)
 from .tools import (
@@ -86,6 +87,9 @@ class EWSMCPServer:
         # Initialize server
         self.server = Server(self.settings.mcp_server_name)
 
+        # Initialize account manager
+        self.account_manager = AccountManager()
+
         # Initialize components
         self.auth_handler = AuthHandler(self.settings)
         self.ews_client = EWSClient(self.settings, self.auth_handler)
@@ -145,6 +149,37 @@ class EWSMCPServer:
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             """Execute a tool."""
+            # 检查是否提供了api_key参数用于多账户支持
+            api_key = arguments.pop('api_key', None)
+            
+            # 如果提供了api_key，切换到对应的账户
+            if api_key and self.account_manager.has_accounts():
+                account_config = self.account_manager.get_account(api_key)
+                if account_config:
+                    try:
+                        self.ews_client.set_account_config(account_config)
+                        self.logger.info(f"切换到账户: {account_config.name}")
+                    except Exception as e:
+                        error_response = {
+                            "success": False,
+                            "error": f"切换账户失败: {str(e)}",
+                            "api_key": api_key
+                        }
+                        return [TextContent(
+                            type="text",
+                            text=str(error_response)
+                        )]
+                else:
+                    error_response = {
+                        "success": False,
+                        "error": f"未找到API key对应的账户: {api_key}",
+                        "available_accounts": self.account_manager.list_accounts()
+                    }
+                    return [TextContent(
+                        type="text",
+                        text=str(error_response)
+                    )]
+            
             # Check rate limit
             if self.rate_limiter:
                 try:
@@ -176,9 +211,10 @@ class EWSMCPServer:
 
                 # Audit log
                 if self.settings.enable_audit_log:
+                    current_user = self.ews_client._current_account_config.ews_email if self.ews_client._current_account_config else self.settings.ews_email
                     self.audit_logger.log_operation(
                         operation=name,
-                        user=self.settings.ews_email,
+                        user=current_user,
                         success=result.get("success", False),
                         details={"arguments": arguments}
                     )
@@ -421,6 +457,26 @@ class EWSMCPServer:
         # Create endpoint wrapper that converts Starlette request to ASGI
         async def mcp_endpoint(request):
             """Wrapper to call session_manager.handle_request with ASGI parameters."""
+            # 从请求头中提取 Bearer token (API key)
+            auth_header = request.headers.get("authorization", "")
+            api_key = None
+            
+            if auth_header.startswith("Bearer "):
+                api_key = auth_header[7:].strip()  # 移除 "Bearer " 前缀
+                self.logger.info(f"从请求头中提取到 API key: {api_key}")
+                
+                # 根据 API key 切换账户
+                if self.account_manager.has_accounts():
+                    account_config = self.account_manager.get_account(api_key)
+                    if account_config:
+                        try:
+                            self.ews_client.set_account_config(account_config)
+                            self.logger.info(f"已切换到账户: {account_config.name} ({account_config.ews_email})")
+                        except Exception as e:
+                            self.logger.error(f"切换账户失败: {e}")
+                    else:
+                        self.logger.warning(f"未找到 API key 对应的账户: {api_key}")
+            
             scope = request.scope
             receive = request.receive
             

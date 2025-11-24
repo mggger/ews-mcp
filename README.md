@@ -25,7 +25,16 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 
 ## What's New in v2.1 🎯
 
-Version 2.1 adds **Contact Intelligence** capabilities with **3 new tools** (bringing total to 43 base tools):
+Version 2.1 adds **Contact Intelligence** capabilities and **Multi-Account Support**:
+
+### Multi-Account Support 🔐
+
+- **Bearer Token Authentication**: Dynamically switch between multiple Exchange accounts using HTTP Authorization headers
+- **Account Configuration**: Configure multiple accounts in `accounts.json` with unique API keys
+- **Connection Caching**: Efficient connection reuse for frequently accessed accounts
+- **Backward Compatible**: Falls back to environment variables if no Bearer token provided
+
+See [BEARER_AUTH_GUIDE.md](BEARER_AUTH_GUIDE.md) for detailed setup instructions.
 
 ### Contact Intelligence Tools (3 new tools)
 

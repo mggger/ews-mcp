@@ -2,7 +2,7 @@
 
 from exchangelib import Credentials, OAuth2Credentials, NTLM
 from msal import ConfidentialClientApplication
-from typing import Optional
+from typing import Optional, Union
 import logging
 
 from .config import Settings
@@ -12,26 +12,32 @@ from .exceptions import AuthenticationError
 class AuthHandler:
     """Handle different Exchange authentication methods."""
 
-    def __init__(self, config: Settings):
+    def __init__(self, config: Union[Settings, 'AccountConfig']):
         self.config = config
         self.logger = logging.getLogger(__name__)
         self._token_cache: Optional[str] = None
+
+    @classmethod
+    def from_account_config(cls, account_config: 'AccountConfig') -> 'AuthHandler':
+        """从账户配置创建认证处理器"""
+        return cls(account_config)
 
     def get_credentials(self) -> Credentials:
         """Get appropriate credentials based on auth type."""
 
         try:
-            if self.config.ews_auth_type == "oauth2":
+            auth_type = self.config.ews_auth_type
+            if auth_type == "oauth2":
                 return self._get_oauth2_credentials()
-            elif self.config.ews_auth_type == "basic":
+            elif auth_type == "basic":
                 return self._get_basic_credentials()
-            elif self.config.ews_auth_type == "ntlm":
+            elif auth_type == "ntlm":
                 return self._get_ntlm_credentials()
             else:
-                raise ValueError(f"Unsupported auth type: {self.config.ews_auth_type}")
+                raise ValueError(f"不支持的认证类型: {auth_type}")
         except Exception as e:
-            self.logger.error(f"Failed to get credentials: {e}")
-            raise AuthenticationError(f"Authentication setup failed: {e}")
+            self.logger.error(f"获取凭证失败: {e}")
+            raise AuthenticationError(f"认证设置失败: {e}")
 
     def _get_oauth2_credentials(self) -> OAuth2Credentials:
         """Get OAuth2 credentials using MSAL."""
