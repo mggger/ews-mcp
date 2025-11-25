@@ -7,6 +7,7 @@ A complete Model Context Protocol (MCP) server that interfaces with Microsoft Ex
 ## Features
 
 - ✅ **Email Operations**: Send, read, search, delete, move, **copy** emails with **fixed** attachment support
+  - **Distribution List Support**: Send emails to distribution lists (通讯组) by name
 - ✅ **Attachment Content Extraction**: Read text from PDF, DOCX, XLSX, TXT files (Arabic/UTF-8 support)
 - ✅ **Calendar Management**: Create, update, delete appointments, respond to meetings, **AI-powered meeting time finder**
 - ✅ **Contact Management**: Full CRUD operations for Exchange contacts
@@ -596,6 +597,9 @@ docker pull ghcr.io/azizmazrou/ews-mcp:main
 ### Email Tools (9 tools)
 
 - **send_email**: Send emails with attachments and CC/BCC (✅ **FIXED:** Attachments now actually send!)
+  - ⭐ **NEW**: Distribution list support - send to groups by name (e.g., "Team-All", "accounts")
+  - Supports email addresses, display names, and distribution lists
+  - Automatic expansion of distribution list members
 - **read_emails**: Read emails from specified folder
 - **search_emails**: Search with advanced filters
 - **get_email_details**: Get full email details

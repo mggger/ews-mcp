@@ -214,14 +214,14 @@ class SendEmailTool(BaseTool):
     def get_schema(self) -> Dict[str, Any]:
         return {
             "name": "send_email",
-            "description": "Send an email through Exchange with optional attachments and CC/BCC. Automatically uses professional HTML template with signature.",
+            "description": "Send an email through Exchange with optional attachments and CC/BCC. Automatically uses professional HTML template with signature. Supports distribution lists (directory names).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "to": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Recipient email addresses"
+                        "description": "Recipients: email addresses (user@domain.com), display names (John Doe), or distribution list names (Team-All, Marketing-Group)"
                     },
                     "subject": {
                         "type": "string",
@@ -234,12 +234,12 @@ class SendEmailTool(BaseTool):
                     "cc": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "CC recipients (optional)"
+                        "description": "CC recipients: email addresses, display names, or distribution list names (optional)"
                     },
                     "bcc": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "BCC recipients (optional)"
+                        "description": "BCC recipients: email addresses, display names, or distribution list names (optional)"
                     },
                     "importance": {
                         "type": "string",
@@ -256,60 +256,190 @@ class SendEmailTool(BaseTool):
             }
         }
 
+    def _resolve_recipients(self, recipients: List[str]) -> List[Mailbox]:
+        """
+        Resolve recipients which can be:
+        - Email addresses (user@domain.com)
+        - Display names (John Doe)
+        - Distribution list names (Team-All, Marketing-Group, accounts)
+        
+        Returns list of Mailbox objects ready for sending.
+        """
+        resolved_mailboxes = []
+        
+        for recipient in recipients:
+            try:
+                self.logger.info(f"Resolving recipient: '{recipient}'")
+                
+                # Try multiple search scopes to find the recipient
+                resolved = None
+                for search_scope in ['ActiveDirectory', 'ActiveDirectoryContacts', None]:
+                    try:
+                        self.logger.debug(f"Trying resolve_names with scope: {search_scope}")
+                        resolve_kwargs = {
+                            'names': [recipient],
+                            'return_full_contact_data': True
+                        }
+                        if search_scope:
+                            resolve_kwargs['search_scope'] = search_scope
+                        
+                        resolved = self.ews_client.account.protocol.resolve_names(**resolve_kwargs)
+                        
+                        if resolved and len(resolved) > 0:
+                            self.logger.info(f"Found {len(resolved)} result(s) with scope: {search_scope}")
+                            break
+                    except Exception as e:
+                        self.logger.debug(f"Scope {search_scope} failed: {e}")
+                        continue
+                
+                if resolved and len(resolved) > 0:
+                    # Filter for exact name match (case-insensitive)
+                    exact_matches = []
+                    for item in resolved:
+                        if isinstance(item, tuple) and len(item) >= 1:
+                            mb = item[0]
+                            mb_name = getattr(mb, 'name', '')
+                            mb_email = getattr(mb, 'email_address', '')
+                            
+                            # Check for exact match on name or email prefix
+                            if mb_name and mb_name.lower() == recipient.lower():
+                                exact_matches.append(item)
+                                self.logger.debug(f"Exact match: {mb_name} <{mb_email}>")
+                            elif mb_email and mb_email.lower().startswith(recipient.lower() + '@'):
+                                exact_matches.append(item)
+                                self.logger.debug(f"Email prefix match: {mb_name} <{mb_email}>")
+                            else:
+                                self.logger.debug(f"Partial match (ignored): {mb_name} <{mb_email}>")
+                    
+                    if len(exact_matches) == 0:
+                        self.logger.warning(f"Found {len(resolved)} results but no exact match for '{recipient}', using first result")
+                        exact_matches = resolved[:1]
+                    elif len(exact_matches) > 1:
+                        self.logger.info(f"Found {len(exact_matches)} exact matches for '{recipient}', using first")
+                    
+                    # Process exact matches only
+                    for idx, item in enumerate(exact_matches):
+                        self.logger.debug(f"=== Resolution item #{idx+1} ===")
+                        self.logger.debug(f"Type: {type(item)}")
+                        
+                        # exchangelib returns tuples: (Mailbox, Contact)
+                        mailbox = None
+                        if isinstance(item, tuple) and len(item) >= 1:
+                            # First element is the Mailbox
+                            mailbox = item[0]
+                            self.logger.debug(f"Extracted mailbox from tuple[0]: {type(mailbox)}")
+                        elif hasattr(item, 'mailbox'):
+                            mailbox = item.mailbox
+                            self.logger.debug(f"Got mailbox via .mailbox")
+                        else:
+                            mailbox = item
+                            self.logger.debug(f"Using item as mailbox directly")
+                        
+                        if mailbox is None:
+                            self.logger.warning(f"Could not extract mailbox from item")
+                            continue
+                        
+                        # Get mailbox properties
+                        mailbox_type = getattr(mailbox, 'mailbox_type', None)
+                        email_address = getattr(mailbox, 'email_address', None)
+                        name = getattr(mailbox, 'name', None)
+                        
+                        self.logger.info(f"Resolved '{recipient}' -> Name: {name}, Type: {mailbox_type}, Email: {email_address}")
+                        
+                        if mailbox_type in ('PublicDL', 'PrivateDL', 'GroupMailbox'):
+                            # This is a distribution list - try to expand it
+                            self.logger.info(f"✓ Detected distribution list: {recipient} (Type: {mailbox_type})")
+                            
+                            if not email_address:
+                                self.logger.error(f"Distribution list has no email address!")
+                                raise ToolExecutionError(f"Distribution list '{recipient}' has no email address")
+                            
+                            try:
+                                # Use ExpandDL to get members
+                                self.logger.info(f"Expanding DL: {email_address}")
+                                members = list(self.ews_client.account.protocol.expand_dl(email_address))
+                                
+                                self.logger.info(f"✓ Expansion successful! Found {len(members)} members")
+                                
+                                if len(members) > 0:
+                                    for member in members:
+                                        member_mailbox = member.mailbox if hasattr(member, 'mailbox') else member
+                                        member_email = getattr(member_mailbox, 'email_address', None)
+                                        member_name = getattr(member_mailbox, 'name', None)
+                                        
+                                        if member_email:
+                                            resolved_mailboxes.append(Mailbox(email_address=member_email))
+                                            self.logger.debug(f"  + Member: {member_name} <{member_email}>")
+                                        else:
+                                            self.logger.warning(f"  - Skipped member with no email: {member_name}")
+                                    
+                                    self.logger.info(f"✓ Added {len(members)} members from '{recipient}'")
+                                else:
+                                    # No members found, use DL address directly
+                                    self.logger.warning(f"No members in DL '{recipient}', using DL address directly")
+                                    resolved_mailboxes.append(Mailbox(email_address=email_address))
+                                    
+                            except Exception as e:
+                                self.logger.error(f"✗ Failed to expand DL '{recipient}': {e}")
+                                # Fall back to using the DL address directly
+                                self.logger.info(f"Fallback: Using DL address directly: {email_address}")
+                                resolved_mailboxes.append(Mailbox(email_address=email_address))
+                        else:
+                            # Regular mailbox or contact
+                            if email_address:
+                                resolved_mailboxes.append(Mailbox(email_address=email_address))
+                                self.logger.info(f"✓ Added mailbox: {name} <{email_address}>")
+                            else:
+                                self.logger.warning(f"Resolved item has no email address: {name}")
+                else:
+                    # Could not resolve - might be external email
+                    if '@' in recipient:
+                        # Looks like an email address, use it directly
+                        resolved_mailboxes.append(Mailbox(email_address=recipient))
+                        self.logger.warning(f"Could not resolve '{recipient}', using as external email")
+                    else:
+                        # Not an email format and couldn't resolve
+                        self.logger.error(f"✗ Could not resolve '{recipient}' - not found in directory and not an email address")
+                        raise ToolExecutionError(
+                            f"Could not resolve recipient '{recipient}'. "
+                            f"Please check: (1) Name is correct, (2) Distribution list exists in directory, "
+                            f"(3) Or provide full email address"
+                        )
+                        
+            except ToolExecutionError:
+                raise
+            except Exception as e:
+                # If resolution fails but looks like email, use it
+                if '@' in recipient:
+                    resolved_mailboxes.append(Mailbox(email_address=recipient))
+                    self.logger.warning(f"Error resolving '{recipient}': {e}, using as-is")
+                else:
+                    self.logger.error(f"✗ Failed to resolve '{recipient}': {e}")
+                    raise ToolExecutionError(f"Could not resolve recipient '{recipient}': {e}")
+        
+        if not resolved_mailboxes:
+            raise ToolExecutionError("No valid recipients found after resolution")
+        
+        self.logger.info(f"✓ Total resolved recipients: {len(resolved_mailboxes)}")
+        return resolved_mailboxes
+
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Send email via EWS."""
         # Validate input
         request = self.validate_input(SendEmailRequest, **kwargs)
 
         try:
-            # Validate recipients before sending (helps catch invalid addresses early)
-            all_recipients = request.to + (request.cc or []) + (request.bcc or [])
-            invalid_recipients = []
-            unresolved_external = []
-
-            for recipient in all_recipients:
-                try:
-                    # Try to resolve the recipient via EWS
-                    resolved = self.ews_client.account.protocol.resolve_names(
-                        names=[recipient],
-                        return_full_contact_data=False
-                    )
-                    # Check if resolution succeeded
-                    if not resolved or not any(resolved):
-                        # Recipient couldn't be resolved - determine if internal or external
-                        recipient_domain = recipient.split('@')[1] if '@' in recipient else ''
-                        sender_domain = self.ews_client.account.primary_smtp_address.split('@')[1]
-
-                        if recipient_domain == sender_domain:
-                            # Internal address that can't be resolved - error
-                            invalid_recipients.append(recipient)
-                        else:
-                            # External address that can't be resolved - warning
-                            unresolved_external.append(recipient)
-                            self.logger.warning(f"Could not verify external recipient: {recipient}")
-                except Exception as e:
-                    # resolve_names failed - likely external address
-                    recipient_domain = recipient.split('@')[1] if '@' in recipient else ''
-                    sender_domain = self.ews_client.account.primary_smtp_address.split('@')[1]
-                    if recipient_domain == sender_domain:
-                        invalid_recipients.append(recipient)
-                    else:
-                        unresolved_external.append(recipient)
-                        self.logger.warning(f"Could not validate recipient {recipient}: {e}")
-
-            # Raise error if any internal recipients are invalid
-            if invalid_recipients:
-                raise ToolExecutionError(
-                    f"Invalid or non-existent recipients: {', '.join(invalid_recipients)}"
-                )
-
-            # Warn user about unresolved external recipients
-            if unresolved_external:
-                self.logger.warning(
-                    f"Warning: {len(unresolved_external)} external recipient(s) could not be verified "
-                    f"and may bounce: {', '.join(unresolved_external[:3])}"
-                    + ("..." if len(unresolved_external) > 3 else "")
-                )
+            # Resolve all recipients (handles emails, names, and distribution lists)
+            self.logger.info("Resolving recipients...")
+            resolved_to = self._resolve_recipients(request.to)
+            resolved_cc = self._resolve_recipients(request.cc or []) if request.cc else []
+            resolved_bcc = self._resolve_recipients(request.bcc or []) if request.bcc else []
+            
+            self.logger.info(f"Resolved {len(request.to)} TO recipient(s) to {len(resolved_to)} email(s)")
+            if request.cc:
+                self.logger.info(f"Resolved {len(request.cc)} CC recipient(s) to {len(resolved_cc)} email(s)")
+            if request.bcc:
+                self.logger.info(f"Resolved {len(request.bcc)} BCC recipient(s) to {len(resolved_bcc)} email(s)")
 
             # Clean and prepare email body
             email_body = request.body.strip()
@@ -341,7 +471,7 @@ class SendEmailTool(BaseTool):
                     account=self.ews_client.account,
                     subject=request.subject,
                     body=HTMLBody(email_body),
-                    to_recipients=[Mailbox(email_address=email) for email in request.to]
+                    to_recipients=resolved_to
                 )
                 self.logger.info("Using HTMLBody for HTML content")
             else:
@@ -349,17 +479,17 @@ class SendEmailTool(BaseTool):
                     account=self.ews_client.account,
                     subject=request.subject,
                     body=Body(email_body),
-                    to_recipients=[Mailbox(email_address=email) for email in request.to]
+                    to_recipients=resolved_to
                 )
                 self.logger.info("Using Body (plain text) for non-HTML content")
 
             # Add CC recipients
-            if request.cc:
-                message.cc_recipients = [Mailbox(email_address=email) for email in request.cc]
+            if resolved_cc:
+                message.cc_recipients = resolved_cc
 
             # Add BCC recipients
-            if request.bcc:
-                message.bcc_recipients = [Mailbox(email_address=email) for email in request.bcc]
+            if resolved_bcc:
+                message.bcc_recipients = resolved_bcc
 
             # Set importance
             message.importance = request.importance.value
@@ -396,13 +526,24 @@ class SendEmailTool(BaseTool):
             message.send_and_save()
             
             attachment_info = f" with {len(request.attachments)} attachment(s)" if request.attachments else ""
-            self.logger.info(f"✅ Email sent successfully to {', '.join(request.to)}{attachment_info}")
+            total_recipients = len(resolved_to) + len(resolved_cc) + len(resolved_bcc)
+            self.logger.info(f"✅ Email sent successfully to {total_recipients} recipient(s){attachment_info}")
 
             return format_success_response(
                 "Email sent successfully",
                 message_id=message.id if hasattr(message, 'id') else None,
                 sent_time=datetime.now().isoformat(),
-                recipients=request.to,
+                original_recipients={
+                    "to": request.to,
+                    "cc": request.cc or [],
+                    "bcc": request.bcc or []
+                },
+                resolved_recipients={
+                    "to": [m.email_address for m in resolved_to],
+                    "cc": [m.email_address for m in resolved_cc],
+                    "bcc": [m.email_address for m in resolved_bcc]
+                },
+                total_recipients=total_recipients,
                 attachments=len(request.attachments) if request.attachments else 0
             )
 

@@ -32,15 +32,25 @@ class ResponseType(str, Enum):
 # Email Models
 class SendEmailRequest(BaseModel):
     """Request model for sending email with attachment validation."""
-    to: List[EmailStr] = Field(..., description="Recipient email addresses")
+    to: List[str] = Field(..., description="Recipients: email addresses, display names, or distribution list names")
     subject: str = Field(..., min_length=1, description="Email subject")
     body: str = Field(..., description="Email body (HTML supported)")
     use_template: bool = Field(True, description="Use HTML template with signature")
-    cc: Optional[List[EmailStr]] = Field(None, description="CC recipients")
-    bcc: Optional[List[EmailStr]] = Field(None, description="BCC recipients")
+    cc: Optional[List[str]] = Field(None, description="CC recipients: email addresses, display names, or distribution list names")
+    bcc: Optional[List[str]] = Field(None, description="BCC recipients: email addresses, display names, or distribution list names")
     importance: ImportanceLevel = ImportanceLevel.NORMAL
     sensitivity: SensitivityLevel = SensitivityLevel.NORMAL
     attachments: Optional[List[str]] = Field(None, description="Attachment file paths")
+
+    @field_validator("to", "cc", "bcc")
+    @classmethod
+    def validate_recipients(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate recipient strings are not empty."""
+        if v:
+            for recipient in v:
+                if not recipient or not recipient.strip():
+                    raise ValueError("Recipient cannot be empty")
+        return v
 
     @field_validator("attachments")
     @classmethod
