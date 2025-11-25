@@ -34,8 +34,7 @@ class SendEmailRequest(BaseModel):
     """Request model for sending email with attachment validation."""
     to: List[str] = Field(..., description="Recipients: email addresses, display names, or distribution list names")
     subject: str = Field(..., min_length=1, description="Email subject")
-    body: str = Field(..., description="Email body (HTML supported)")
-    use_template: bool = Field(True, description="Use HTML template with signature")
+    body: str = Field(..., description="Email body (HTML supported, template applied automatically)")
     cc: Optional[List[str]] = Field(None, description="CC recipients: email addresses, display names, or distribution list names")
     bcc: Optional[List[str]] = Field(None, description="BCC recipients: email addresses, display names, or distribution list names")
     importance: ImportanceLevel = ImportanceLevel.NORMAL
