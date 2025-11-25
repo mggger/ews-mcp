@@ -59,6 +59,9 @@ COPY --chown=mcp:mcp src/ ./src/
 # Copy scripts
 COPY --chown=mcp:mcp scripts/ ./scripts/
 
+# Copy accounts configuration
+COPY --chown=mcp:mcp accounts.json ./accounts.json
+
 # Copy default attachment
 COPY --chown=mcp:mcp mick.png ./mick.png
 
