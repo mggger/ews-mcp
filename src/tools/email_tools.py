@@ -5,6 +5,8 @@ from datetime import datetime
 from exchangelib import Message, Mailbox, FileAttachment, HTMLBody, Body, Folder
 from exchangelib.queryset import Q
 import re
+import os
+from pathlib import Path
 
 from .base import BaseTool
 from ..models import SendEmailRequest, EmailSearchRequest, EmailDetails
@@ -142,10 +144,77 @@ async def resolve_folder(ews_client, folder_identifier: str):
 class SendEmailTool(BaseTool):
     """Tool for sending emails."""
 
+    def _apply_email_template(self, user_content: str) -> str:
+        """
+        Apply HTML email template to user content.
+        
+        Args:
+            user_content: User's email content (can be plain text or HTML)
+            
+        Returns:
+            Complete HTML email with template applied
+        """
+        # Get template path
+        template_path = Path(__file__).parent.parent.parent / "templates" / "email_template.html"
+        
+        try:
+            # Read template
+            with open(template_path, 'r', encoding='utf-8') as f:
+                template = f.read()
+            
+            # If user content is plain text, wrap in paragraph tags
+            if not re.search(r'<[^>]+>', user_content):
+                user_content = f"<p>{user_content.replace(chr(10), '</p><p>')}</p>"
+            
+            # Replace placeholder with user content
+            html_content = template.replace('{{EMAIL_CONTENT}}', user_content)
+            
+            return html_content
+            
+        except FileNotFoundError:
+            self.logger.warning(f"Email template not found at {template_path}, using content as-is")
+            return user_content
+        except Exception as e:
+            self.logger.error(f"Error applying email template: {e}")
+            return user_content
+
+    def _attach_signature_image(self, message: Message) -> None:
+        """
+        Attach signature image (mick.png) as inline content.
+        
+        Args:
+            message: Exchange message object to attach image to
+        """
+        # Get image path
+        image_path = Path(__file__).parent.parent.parent / "mick.png"
+        
+        if not image_path.exists():
+            self.logger.warning(f"Signature image not found at {image_path}")
+            return
+        
+        try:
+            # Read image file
+            with open(image_path, 'rb') as f:
+                image_content = f.read()
+            
+            # Create inline attachment with Content-ID
+            inline_attachment = FileAttachment(
+                name='mick.png',
+                content=image_content,
+                is_inline=True,
+                content_id='mick_signature'
+            )
+            
+            message.attach(inline_attachment)
+            self.logger.info(f"Attached inline signature image: mick.png ({len(image_content)} bytes)")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to attach signature image: {e}")
+
     def get_schema(self) -> Dict[str, Any]:
         return {
             "name": "send_email",
-            "description": "Send an email through Exchange with optional attachments and CC/BCC",
+            "description": "Send an email through Exchange with optional attachments and CC/BCC. Automatically uses professional HTML template with signature.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -160,7 +229,7 @@ class SendEmailTool(BaseTool):
                     },
                     "body": {
                         "type": "string",
-                        "description": "Email body (HTML supported)"
+                        "description": "Email body content (plain text or HTML)"
                     },
                     "cc": {
                         "type": "array",
@@ -189,26 +258,6 @@ class SendEmailTool(BaseTool):
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Send email via EWS."""
-        # Always add default attachment (mick.png)
-        default_attachment = "mick.png"
-        from pathlib import Path
-        
-        # Get existing attachments or initialize empty list
-        existing_attachments = kwargs.get("attachments", []) or []
-        
-        # Check if default attachment exists and add it
-        if Path(default_attachment).exists():
-            # Add default attachment to the list (avoid duplicates)
-            if default_attachment not in existing_attachments:
-                existing_attachments.insert(0, default_attachment)  # Add at beginning
-                self.logger.info(f"Adding default attachment: {default_attachment}")
-            kwargs["attachments"] = existing_attachments
-        else:
-            self.logger.warning(f"Default attachment not found: {default_attachment}")
-            # Still use existing attachments if any
-            if existing_attachments:
-                kwargs["attachments"] = existing_attachments
-        
         # Validate input
         request = self.validate_input(SendEmailRequest, **kwargs)
 
@@ -274,8 +323,10 @@ class SendEmailTool(BaseTool):
             if not email_body:
                 raise ToolExecutionError("Email body is empty after processing")
 
-            # Detect if body is HTML or plain text
-            is_html = bool(re.search(r'<[^>]+>', email_body))  # Check for HTML tags
+            # Always apply HTML template with signature
+            email_body = self._apply_email_template(email_body)
+            is_html = True  # Template is always HTML
+            self.logger.info("Applied HTML email template with signature")
 
             # Log body details for debugging
             body_type = "HTML" if is_html else "Plain Text"
@@ -320,6 +371,9 @@ class SendEmailTool(BaseTool):
                     f"Message body: {message.body}"
                 )
             self.logger.info(f"Verified message body set correctly: {len(str(message.body))} characters")
+
+            # Always attach inline signature image (template includes it)
+            self._attach_signature_image(message)
 
             # Add attachments if provided
             if request.attachments:

@@ -35,6 +35,7 @@ class SendEmailRequest(BaseModel):
     to: List[EmailStr] = Field(..., description="Recipient email addresses")
     subject: str = Field(..., min_length=1, description="Email subject")
     body: str = Field(..., description="Email body (HTML supported)")
+    use_template: bool = Field(True, description="Use HTML template with signature")
     cc: Optional[List[EmailStr]] = Field(None, description="CC recipients")
     bcc: Optional[List[EmailStr]] = Field(None, description="BCC recipients")
     importance: ImportanceLevel = ImportanceLevel.NORMAL
