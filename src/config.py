@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     ews_client_secret: Optional[str] = None
     ews_tenant_id: Optional[str] = None
     ews_username: Optional[str] = None
+    # 密码通过 MCP 客户端 Bearer token 传递，不在 .env 配置
     ews_password: Optional[str] = None
 
     # Server configuration
@@ -86,8 +87,12 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(f"OAuth2 auth requires: {', '.join(missing)}")
         elif self.ews_auth_type in ("basic", "ntlm"):
-            if not self.ews_username or not self.ews_password:
-                raise ValueError(f"{self.ews_auth_type.upper()} auth requires ews_username and ews_password")
+            # 密码通过 Bearer token 传递，只需要验证用户名/邮箱
+            if not self.ews_username and not self.ews_email:
+                raise ValueError(f"{self.ews_auth_type.upper()} auth requires ews_username or ews_email")
+            # 设置 username 为 email（如果未设置）
+            if not self.ews_username:
+                self.ews_username = self.ews_email
 
         # Validate AI settings
         if self.enable_ai:

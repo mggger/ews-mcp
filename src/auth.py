@@ -2,7 +2,7 @@
 
 from exchangelib import Credentials, OAuth2Credentials, NTLM
 from msal import ConfidentialClientApplication
-from typing import Optional, Union
+from typing import Optional
 import logging
 
 from .config import Settings
@@ -12,15 +12,10 @@ from .exceptions import AuthenticationError
 class AuthHandler:
     """Handle different Exchange authentication methods."""
 
-    def __init__(self, config: Union[Settings, 'AccountConfig']):
+    def __init__(self, config: Settings):
         self.config = config
         self.logger = logging.getLogger(__name__)
         self._token_cache: Optional[str] = None
-
-    @classmethod
-    def from_account_config(cls, account_config: 'AccountConfig') -> 'AuthHandler':
-        """从账户配置创建认证处理器"""
-        return cls(account_config)
 
     def get_credentials(self) -> Credentials:
         """Get appropriate credentials based on auth type."""

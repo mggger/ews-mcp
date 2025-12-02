@@ -12,7 +12,6 @@ import urllib3
 from .config import Settings
 from .auth import AuthHandler
 from .exceptions import ConnectionError, AuthenticationError
-from .account_manager import AccountConfig
 
 # Suppress SSL warnings when using NoVerifyHTTPAdapter
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -26,8 +25,7 @@ class EWSClient:
         self.auth_handler = auth_handler
         self.logger = logging.getLogger(__name__)
         self._account: Optional[Account] = None
-        self._accounts_cache: Dict[str, Account] = {}  # 缓存多个账户连接
-        self._current_account_config: Optional[AccountConfig] = None
+        self._accounts_cache: Dict[str, Account] = {}  # 缓存连接
 
         # Configure exchangelib
         BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
@@ -42,64 +40,61 @@ class EWSClient:
             self._account = self._create_account()
         return self._account
 
-    def set_account_config(self, account_config: AccountConfig):
-        """设置当前使用的账户配置"""
-        self._current_account_config = account_config
+    def set_bearer_password(self, password: str):
+        """设置 Bearer 认证的密码（密码通过 Bearer token 传递）"""
+        # 使用密码的哈希作为缓存 key
+        import hashlib
+        cache_key = f"bearer_{hashlib.sha256(password.encode()).hexdigest()[:16]}"
         
-        # 检查缓存中是否已有此账户的连接
-        cache_key = account_config.api_key
         if cache_key in self._accounts_cache:
             self._account = self._accounts_cache[cache_key]
-            self.logger.info(f"使用缓存的账户连接: {account_config.name}")
+            self.logger.info(f"使用缓存的 Bearer 认证连接: {self.config.ews_email}")
         else:
             # 创建新连接
-            self._account = self._create_account_from_config(account_config)
+            self._account = self._create_account_with_password(password)
             self._accounts_cache[cache_key] = self._account
-            self.logger.info(f"创建新的账户连接: {account_config.name}")
+            self.logger.info(f"创建新的 Bearer 认证连接: {self.config.ews_email}")
 
-    def _create_account_from_config(self, account_config: AccountConfig) -> Account:
-        """根据账户配置创建Exchange账户连接"""
+    def _create_account_with_password(self, password: str) -> Account:
+        """使用指定密码创建 Exchange 账户连接（用于 Bearer 认证）"""
         try:
-            self.logger.info(f"连接到Exchange账户: {account_config.ews_email}")
+            self.logger.info(f"Bearer 认证连接到 Exchange: {self.config.ews_email}")
             
-            # 创建临时的认证处理器
-            temp_auth_handler = AuthHandler.from_account_config(account_config)
-            credentials = temp_auth_handler.get_credentials()
+            # 创建凭据 - 使用 NTLM 或 Basic 认证
+            from exchangelib import Credentials
+            credentials = Credentials(
+                username=self.config.ews_username or self.config.ews_email,
+                password=password
+            )
 
             # 获取时区
             try:
-                tz = EWSTimeZone(account_config.timezone)
-                self.logger.info(f"使用时区: {account_config.timezone}")
+                tz = EWSTimeZone(self.config.timezone)
             except Exception as e:
-                self.logger.warning(f"时区加载失败 {account_config.timezone}, 使用UTC: {e}")
+                self.logger.warning(f"时区加载失败 {self.config.timezone}, 使用UTC: {e}")
                 tz = EWSTimeZone('UTC')
 
-            # 使用自动发现或手动配置
-            if account_config.ews_autodiscover:
-                self.logger.info("使用自动发现")
-                BaseProtocol.TIMEOUT = self.config.request_timeout
+            BaseProtocol.TIMEOUT = self.config.request_timeout
 
+            if self.config.ews_autodiscover:
                 account = Account(
-                    primary_smtp_address=account_config.ews_email,
+                    primary_smtp_address=self.config.ews_email,
                     credentials=credentials,
                     autodiscover=True,
                     access_type=DELEGATE,
                     default_timezone=tz
                 )
             else:
-                if not account_config.ews_server_url:
-                    raise ConnectionError("禁用自动发现时需要EWS_SERVER_URL")
-
-                self.logger.info(f"使用手动配置: {account_config.ews_server_url}")
-                BaseProtocol.TIMEOUT = self.config.request_timeout
+                if not self.config.ews_server_url:
+                    raise ConnectionError("禁用自动发现时需要 EWS_SERVER_URL")
 
                 config = Configuration(
-                    service_endpoint=account_config.ews_server_url,
+                    service_endpoint=self.config.ews_server_url,
                     credentials=credentials
                 )
 
                 account = Account(
-                    primary_smtp_address=account_config.ews_email,
+                    primary_smtp_address=self.config.ews_email,
                     config=config,
                     autodiscover=False,
                     access_type=DELEGATE,
@@ -108,13 +103,13 @@ class EWSClient:
 
             # 测试连接
             _ = account.root.tree()
-            self.logger.info(f"成功连接到Exchange: {account_config.name}")
+            self.logger.info(f"Bearer 认证成功: {self.config.ews_email}")
 
             return account
 
         except Exception as e:
-            self.logger.error(f"创建账户连接失败: {e}")
-            raise ConnectionError(f"连接Exchange失败: {e}")
+            self.logger.error(f"Bearer 认证连接失败: {e}")
+            raise ConnectionError(f"Bearer 认证连接 Exchange 失败: {e}")
 
     @retry(
         stop=stop_after_attempt(3),
