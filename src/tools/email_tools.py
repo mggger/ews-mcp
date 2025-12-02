@@ -259,15 +259,24 @@ class SendEmailTool(BaseTool):
     def _resolve_recipients(self, recipients: List[str]) -> List[Mailbox]:
         """
         Resolve recipients which can be:
-        - Email addresses (user@domain.com)
-        - Display names (John Doe)
-        - Distribution list names (Team-All, Marketing-Group, accounts)
+        - Email addresses (user@domain.com) - used directly without resolution
+        - Display names (John Doe) - resolved via directory
+        - Distribution list names (Team-All, Marketing-Group, accounts) - resolved and expanded
         
         Returns list of Mailbox objects ready for sending.
         """
         resolved_mailboxes = []
         
         for recipient in recipients:
+            recipient = recipient.strip()
+            
+            # 如果包含 @，说明已经是邮箱地址，直接使用，不需要解析
+            if '@' in recipient:
+                resolved_mailboxes.append(Mailbox(email_address=recipient))
+                self.logger.info(f"Using email address directly: '{recipient}'")
+                continue
+            
+            # 不包含 @，需要通过目录解析（可能是显示名或分发列表）
             try:
                 self.logger.info(f"Resolving recipient: '{recipient}'")
                 
@@ -392,30 +401,19 @@ class SendEmailTool(BaseTool):
                             else:
                                 self.logger.warning(f"Resolved item has no email address: {name}")
                 else:
-                    # Could not resolve - might be external email
-                    if '@' in recipient:
-                        # Looks like an email address, use it directly
-                        resolved_mailboxes.append(Mailbox(email_address=recipient))
-                        self.logger.warning(f"Could not resolve '{recipient}', using as external email")
-                    else:
-                        # Not an email format and couldn't resolve
-                        self.logger.error(f"✗ Could not resolve '{recipient}' - not found in directory and not an email address")
-                        raise ToolExecutionError(
-                            f"Could not resolve recipient '{recipient}'. "
-                            f"Please check: (1) Name is correct, (2) Distribution list exists in directory, "
-                            f"(3) Or provide full email address"
-                        )
+                    # Could not resolve - not found in directory
+                    self.logger.error(f"✗ Could not resolve '{recipient}' - not found in directory")
+                    raise ToolExecutionError(
+                        f"Could not resolve recipient '{recipient}'. "
+                        f"Please check: (1) Name is correct, (2) Distribution list exists in directory, "
+                        f"(3) Or provide full email address (user@domain.com)"
+                    )
                         
             except ToolExecutionError:
                 raise
             except Exception as e:
-                # If resolution fails but looks like email, use it
-                if '@' in recipient:
-                    resolved_mailboxes.append(Mailbox(email_address=recipient))
-                    self.logger.warning(f"Error resolving '{recipient}': {e}, using as-is")
-                else:
-                    self.logger.error(f"✗ Failed to resolve '{recipient}': {e}")
-                    raise ToolExecutionError(f"Could not resolve recipient '{recipient}': {e}")
+                self.logger.error(f"✗ Failed to resolve '{recipient}': {e}")
+                raise ToolExecutionError(f"Could not resolve recipient '{recipient}': {e}")
         
         if not resolved_mailboxes:
             raise ToolExecutionError("No valid recipients found after resolution")
