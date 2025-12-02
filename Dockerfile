@@ -62,9 +62,6 @@ COPY --chown=mcp:mcp scripts/ ./scripts/
 # Copy email templates
 COPY --chown=mcp:mcp templates/ ./templates/
 
-# Copy accounts configuration
-COPY --chown=mcp:mcp accounts.json ./accounts.json
-
 # Copy default attachment
 COPY --chown=mcp:mcp mick.png ./mick.png
 
