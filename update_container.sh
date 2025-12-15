@@ -45,6 +45,7 @@ docker run -d \
     --name ews-mcp-server \
     -p 8765:8765 \
     --env-file .env \
+    --restart unless-stopped \
     -v $(pwd)/logs:/app/logs \
     ews-mcp-server:latest
 echo "✓ 容器已启动"
