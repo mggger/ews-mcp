@@ -144,13 +144,14 @@ async def resolve_folder(ews_client, folder_identifier: str):
 class SendEmailTool(BaseTool):
     """Tool for sending emails."""
 
-    def _apply_email_template(self, user_content: str) -> str:
+    def _apply_email_template(self, user_content: str, include_signature: bool = True) -> str:
         """
         Apply HTML email template to user content.
-        
+
         Args:
             user_content: User's email content (can be plain text or HTML)
-            
+            include_signature: Whether to include the signature section
+
         Returns:
             Complete HTML email with template applied
         """
@@ -166,9 +167,20 @@ class SendEmailTool(BaseTool):
             if not re.search(r'<[^>]+>', user_content):
                 user_content = f"<p>{user_content.replace(chr(10), '</p><p>')}</p>"
             
+            # Remove signature section if not needed
+            if not include_signature:
+                # Remove the complete signature block, including its divider.
+                template = re.sub(
+                    r'<!-- SIGNATURE_BLOCK_START -->.*?<!-- SIGNATURE_BLOCK_END -->',
+                    '',
+                    template,
+                    flags=re.DOTALL,
+                    count=1
+                )
+
             # Replace placeholder with user content
             html_content = template.replace('{{EMAIL_CONTENT}}', user_content)
-            
+
             return html_content
             
         except FileNotFoundError:
@@ -177,39 +189,6 @@ class SendEmailTool(BaseTool):
         except Exception as e:
             self.logger.error(f"Error applying email template: {e}")
             return user_content
-
-    def _attach_signature_image(self, message: Message) -> None:
-        """
-        Attach signature image (mick.png) as inline content.
-        
-        Args:
-            message: Exchange message object to attach image to
-        """
-        # Get image path
-        image_path = Path(__file__).parent.parent.parent / "mick.png"
-        
-        if not image_path.exists():
-            self.logger.warning(f"Signature image not found at {image_path}")
-            return
-        
-        try:
-            # Read image file
-            with open(image_path, 'rb') as f:
-                image_content = f.read()
-            
-            # Create inline attachment with Content-ID
-            inline_attachment = FileAttachment(
-                name='mick.png',
-                content=image_content,
-                is_inline=True,
-                content_id='mick_signature'
-            )
-            
-            message.attach(inline_attachment)
-            self.logger.info(f"Attached inline signature image: mick.png ({len(image_content)} bytes)")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to attach signature image: {e}")
 
     def get_schema(self) -> Dict[str, Any]:
         return {
@@ -451,10 +430,14 @@ class SendEmailTool(BaseTool):
             if not email_body:
                 raise ToolExecutionError("Email body is empty after processing")
 
-            # Always apply HTML template with signature
-            email_body = self._apply_email_template(email_body)
+            # Check sender to determine if signature should be included
+            sender_email = getattr(self.ews_client.account, 'primary_smtp_address', '') or ''
+            include_signature = sender_email.lower() != 'wangj@archerround.com'
+
+            # Always apply HTML template (with or without signature)
+            email_body = self._apply_email_template(email_body, include_signature=include_signature)
             is_html = True  # Template is always HTML
-            self.logger.info("Applied HTML email template with signature")
+            self.logger.info(f"Applied HTML email template (signature={'included' if include_signature else 'excluded'})")
 
             # Log body details for debugging
             body_type = "HTML" if is_html else "Plain Text"
@@ -499,9 +482,6 @@ class SendEmailTool(BaseTool):
                     f"Message body: {message.body}"
                 )
             self.logger.info(f"Verified message body set correctly: {len(str(message.body))} characters")
-
-            # Always attach inline signature image (template includes it)
-            self._attach_signature_image(message)
 
             # Add attachments if provided
             if request.attachments:

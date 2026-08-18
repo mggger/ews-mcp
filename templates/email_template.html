@@ -37,31 +37,10 @@
             background: linear-gradient(to right, transparent, #e0e0e0, transparent);
             margin: 30px 0 25px 0;
         }
-        .signature-section {
-            text-align: center;
-            padding: 20px 0;
-        }
-        .signature-image {
-            max-width: 180px;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-            border-radius: 4px;
-        }
-        .footer-note {
-            color: #999999;
-            font-size: 12px;
-            text-align: center;
-            margin-top: 15px;
-            padding: 0 20px;
-        }
         /* 响应式设计 */
         @media only screen and (max-width: 600px) {
             .email-body {
                 padding: 20px 25px;
-            }
-            .signature-image {
-                max-width: 150px;
             }
         }
     </style>
@@ -74,13 +53,60 @@
                 {{EMAIL_CONTENT}}
             </div>
             
-            <!-- 分隔线 -->
+            <!-- SIGNATURE_BLOCK_START -->
             <div class="divider"></div>
-            
-            <!-- 签名区域 -->
-            <div class="signature-section">
-                <img src="cid:mick_signature" alt="Signature" class="signature-image" />
-            </div>
+
+            <!-- Email signature: keep styles inline for Outlook/Gmail compatibility. -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; font-family:Arial, Helvetica, sans-serif; max-width:520px;">
+                <tbody><tr>
+                    <td style="padding:0;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                            <tbody><tr>
+                                <td valign="top" style="padding:0 26px 0 0; vertical-align:top;">
+                                    <div style="font-family:Arial, Helvetica, sans-serif; font-size:19px; line-height:23px; font-weight:bold; color:#1C2129; letter-spacing:0.2px;">Mick West</div>
+                                    <div style="font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:18px; color:#6B7280; padding-top:3px;">Chief Executive Officer</div>
+                                    <div style="font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:18px; font-weight:bold; color:#3D5A8F; padding-top:10px; letter-spacing:0.3px;">Archer &amp; Round</div>
+                                    <div style="font-family:Arial, Helvetica, sans-serif; font-size:11px; line-height:16px; color:#6B7280; padding-top:2px;">Cyber &amp; AI governance for the board</div>
+                                </td>
+                                <td style="padding:0; width:1px; background:#5273B0; font-size:0; line-height:0;">&nbsp;</td>
+                                <td valign="top" style="padding:0 0 0 26px; vertical-align:top;">
+                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                                        <tbody>
+                                            <tr>
+                                                <td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:20px; color:#6B7280; padding:0 8px 0 0; white-space:nowrap;">Direct</td>
+                                                <td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:20px; color:#1C2129;">1800 841 224</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:20px; color:#6B7280; padding:0 8px 0 0; white-space:nowrap;">Email</td>
+                                                <td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:20px;"><a href="mailto:mick@archerround.com" style="color:#3D5A8F; text-decoration:none;">mick@archerround.com</a></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:20px; color:#6B7280; padding:0 8px 0 0; white-space:nowrap;">Web</td>
+                                                <td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:20px;"><a href="https://archerround.com" style="color:#3D5A8F; text-decoration:none;">archerround.com</a></td>
+                                            </tr>
+                                            <tr>
+                                                <td valign="top" style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:18px; color:#6B7280; padding:6px 8px 0 0; white-space:nowrap; vertical-align:top;">Office</td>
+                                                <td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:18px; color:#1C2129; padding-top:6px;">Suite 1677, 1 Denison Street<br>North Sydney NSW 2060<br><span style="color:#6B7280;">Sydney &nbsp;·&nbsp; Los Angeles</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr></tbody>
+                        </table>
+
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:100%; margin-top:16px;">
+                            <tbody><tr><td style="height:1px; background:#D9DCE1; font-size:0; line-height:0;">&nbsp;</td></tr></tbody>
+                        </table>
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-top:12px;">
+                            <tbody><tr><td style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:16px; font-weight:bold; color:#5273B0; letter-spacing:2px; text-transform:uppercase;">Govern. &nbsp;Assure. &nbsp;Protect.</td></tr></tbody>
+                        </table>
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-top:12px; max-width:500px;">
+                            <tbody><tr><td style="font-family:Arial, Helvetica, sans-serif; font-size:9px; line-height:13px; color:#9AA0AA;">This email and any attachments are confidential and intended for the named recipient only. If you have received it in error, please notify the sender and delete it. Archer &amp; Round, North Sydney NSW.</td></tr></tbody>
+                        </table>
+                    </td>
+                </tr></tbody>
+            </table>
+            <!-- SIGNATURE_BLOCK_END -->
         </div>
     </div>
 </body>
