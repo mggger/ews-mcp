@@ -9,7 +9,7 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[
-        "mcp>=1.0.0",
+        "mcp==1.26.0",
         "exchangelib>=5.0.0",
         "pydantic>=2.5.0",
         "python-dotenv>=1.0.0",

@@ -1,5 +1,5 @@
 # Core dependencies
-mcp>=1.0.0
+mcp==1.26.0
 exchangelib==5.0.3
 pydantic>=2.8.0
 pydantic-settings>=2.5.2
