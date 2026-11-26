@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Any
+from typing import Any, Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -110,7 +110,7 @@ class EWSMCPServer:
             action="SERVER_INIT",
             data={
                 "version": "2.1.0",
-                "user": self.settings.ews_email,
+                "user": self.settings.ews_email or "dynamic (per-request header)",
                 "auth_type": self.settings.ews_auth_type,
                 "server_url": self.settings.ews_server_url or "autodiscover"
             },
@@ -126,6 +126,19 @@ class EWSMCPServer:
                 }
             }
         )
+
+    def _get_current_request_headers(self) -> Optional[dict[str, str]]:
+        """Extract HTTP headers from the active MCP request context, if available."""
+        try:
+            req_ctx = self.server.request_context
+        except LookupError:
+            return None
+
+        http_request = getattr(req_ctx, "request", None)
+        if http_request is None or not hasattr(http_request, "headers"):
+            return None
+
+        return dict(http_request.headers)
 
     def _register_handlers(self):
         """Register MCP protocol handlers."""
@@ -144,7 +157,7 @@ class EWSMCPServer:
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-            """Execute a tool."""
+            """Execute a tool with per-request credential isolation."""
             # Check rate limit
             if self.rate_limiter:
                 try:
@@ -172,13 +185,28 @@ class EWSMCPServer:
             self.logger.info(f"Executing tool: {name}")
 
             try:
-                result = await tool.safe_execute(**arguments)
+                request_headers = self._get_current_request_headers()
+                creds = self.ews_client.resolve_request_credentials(request_headers)
+
+                if creds is not None:
+                    account = await asyncio.to_thread(
+                        self.ews_client.get_or_create_account,
+                        creds.email,
+                        creds.password,
+                        creds.username,
+                    )
+                    with self.ews_client.bind_request_account(account, creds.email):
+                        result = await tool.safe_execute(**arguments)
+                        active_user = self.ews_client.current_email
+                else:
+                    result = await tool.safe_execute(**arguments)
+                    active_user = self.ews_client.current_email
 
                 # Audit log
                 if self.settings.enable_audit_log:
                     self.audit_logger.log_operation(
                         operation=name,
-                        user=self.settings.ews_email,
+                        user=active_user,
                         success=result.get("success", False),
                         details={"arguments": arguments}
                     )
@@ -321,20 +349,24 @@ class EWSMCPServer:
     async def run(self):
         """Run the MCP server with comprehensive logging."""
         try:
+            configured_user = self.settings.ews_email or "dynamic (per-request header)"
             self.logger.info(f"Starting {self.settings.mcp_server_name}")
             self.logger.info(f"Server: {self.settings.ews_server_url or 'autodiscover'}")
-            self.logger.info(f"User: {self.settings.ews_email}")
+            self.logger.info(f"Default User: {configured_user}")
             self.logger.info(f"Auth: {self.settings.ews_auth_type}")
 
-            # 密码通过客户端 Bearer token 传递，启动时不测试连接
-            self.logger.info("Bearer 认证模式: 密码将通过客户端 Bearer token 传递")
-            self.logger.info(f"配置的用户邮箱: {self.settings.ews_email}")
+            # 凭据支持按请求通过 HTTP 请求头动态传递（支持多用户并发隔离），启动时不测试连接
+            self.logger.info(
+                "动态多用户认证模式已启用: 支持 X-EWS-Email / X-OpenWebUI-User-Email + "
+                "X-EWS-Password / Authorization (Bearer / Basic)"
+            )
+            self.logger.info(f"默认用户邮箱: {configured_user}")
             self.logger.info(f"EWS 认证类型: {self.settings.ews_auth_type}")
             self.log_manager.log_activity(
                 level="INFO",
                 module="main",
-                action="BEARER_AUTH_MODE",
-                data={"email": self.settings.ews_email},
+                action="DYNAMIC_AUTH_MODE",
+                data={"default_email": configured_user},
                 result={"status": "waiting_for_client"},
                 context={"ews_auth_type": self.settings.ews_auth_type}
             )
@@ -378,10 +410,8 @@ class EWSMCPServer:
             self.ews_client.close()
             self.logger.info("Server stopped")
 
-    async def run_streamable_http(self):
-        """Run the MCP server with StreamableHTTP transport."""
-        import uvicorn
-
+    def create_streamable_http_app(self):
+        """Build the Starlette ASGI app for StreamableHTTP transport."""
         # Create session manager with stateful mode
         session_manager = StreamableHTTPSessionManager(
             app=self.server,
@@ -401,21 +431,9 @@ class EWSMCPServer:
         # Create endpoint wrapper that converts Starlette request to ASGI
         async def mcp_endpoint(request):
             """Wrapper to call session_manager.handle_request with ASGI parameters."""
-            # 从请求头中提取 Bearer token
-            auth_header = request.headers.get("authorization", "")
-            bearer_token = None
-            
-            if auth_header.startswith("Bearer "):
-                bearer_token = auth_header[7:].strip()  # 移除 "Bearer " 前缀
-                self.logger.debug(f"从请求头中提取到 Bearer token")
-                
-                # Bearer token 就是密码，使用 NTLM/Basic 与 EWS 通信
-                try:
-                    self.ews_client.set_bearer_password(bearer_token)
-                    self.logger.info(f"Bearer 认证: 使用用户 {self.settings.ews_email}")
-                except Exception as e:
-                    self.logger.error(f"Bearer 认证失败: {e}")
-            
+            # Per-request credentials are extracted inside call_tool from
+            # self.server.request_context.request.headers to guarantee multi-user isolation
+            # and avoid connecting to Exchange during initialize / tools/list.
             scope = request.scope
             receive = request.receive
             
@@ -466,7 +484,13 @@ class EWSMCPServer:
                 await self.app(scope, receive, send)
 
         # Wrap Starlette app with path normalizer
-        app = ASGIPathNormalizer(starlette_app)
+        return ASGIPathNormalizer(starlette_app)
+
+    async def run_streamable_http(self):
+        """Run the MCP server with StreamableHTTP transport."""
+        import uvicorn
+
+        app = self.create_streamable_http_app()
 
         # Run with uvicorn
         config = uvicorn.Config(

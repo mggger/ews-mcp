@@ -49,6 +49,7 @@ def mock_ews_client(mock_settings, mock_auth_handler):
     mock_account.tasks = MagicMock()
 
     client.account = mock_account
+    client.current_email = mock_settings.ews_email
     client.test_connection = Mock(return_value=True)
 
     return client

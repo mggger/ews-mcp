@@ -38,6 +38,13 @@ class BaseTool(ABC):
             self.logger.error(f"Validation error: {e}")
             raise ValidationError(f"Invalid input: {e}")
 
+    def _get_audit_user(self) -> str:
+        """Return active request email when available, falling back to configured email."""
+        current_email = getattr(self.ews_client, "current_email", None)
+        if isinstance(current_email, str) and current_email:
+            return current_email
+        return getattr(self.ews_client.config, "ews_email", None) or "unknown"
+
     async def safe_execute(self, **kwargs) -> Dict[str, Any]:
         """Execute with error handling and comprehensive logging."""
         start_time = time.time()
@@ -82,7 +89,7 @@ class BaseTool(ABC):
 
             # Audit log
             self.log_manager.log_audit(
-                user=self.ews_client.config.ews_email,
+                user=self._get_audit_user(),
                 action=tool_name,
                 resource=f"{tool_name}_operation",
                 result="success",
@@ -135,7 +142,7 @@ class BaseTool(ABC):
 
         # Audit log
         self.log_manager.log_audit(
-            user=self.ews_client.config.ews_email,
+            user=self._get_audit_user(),
             action=tool_name,
             resource=f"{tool_name}_operation",
             result="failed",

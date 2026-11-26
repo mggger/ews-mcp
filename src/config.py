@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # Exchange settings
     ews_server_url: Optional[str] = None
-    ews_email: str
+    ews_email: Optional[str] = None
     ews_autodiscover: bool = True
 
     # Authentication
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     ews_client_secret: Optional[str] = None
     ews_tenant_id: Optional[str] = None
     ews_username: Optional[str] = None
-    # 密码通过 MCP 客户端 Bearer token 传递，不在 .env 配置
+    # 密码可通过 MCP 客户端请求头动态传递，也可在 .env 中配置默认值
     ews_password: Optional[str] = None
 
     # Server configuration
@@ -79,6 +79,7 @@ class Settings(BaseSettings):
         """Validate required credentials based on auth type."""
         if self.ews_auth_type == "oauth2":
             required = {
+                "ews_email": self.ews_email,
                 "ews_client_id": self.ews_client_id,
                 "ews_client_secret": self.ews_client_secret,
                 "ews_tenant_id": self.ews_tenant_id
@@ -87,11 +88,12 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(f"OAuth2 auth requires: {', '.join(missing)}")
         elif self.ews_auth_type in ("basic", "ntlm"):
-            # 密码通过 Bearer token 传递，只需要验证用户名/邮箱
-            if not self.ews_username and not self.ews_email:
-                raise ValueError(f"{self.ews_auth_type.upper()} auth requires ews_username or ews_email")
-            # 设置 username 为 email（如果未设置）
-            if not self.ews_username:
+            # streamable_http 模式下支持通过 HTTP 请求头动态传入 email 和 password（多用户模式）
+            # stdio 模式下需要在 .env 中配置用户名/邮箱
+            if self.mcp_transport == "stdio" and not self.ews_username and not self.ews_email:
+                raise ValueError(f"{self.ews_auth_type.upper()} auth in stdio mode requires ews_username or ews_email")
+            # 设置 username 为 email（如果已配置 email 但未配置 username）
+            if not self.ews_username and self.ews_email:
                 self.ews_username = self.ews_email
 
         # Validate AI settings
